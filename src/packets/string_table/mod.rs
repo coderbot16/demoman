@@ -2,6 +2,10 @@ use std::collections::VecDeque;
 use demo::bits::BitReader;
 use std::io::Read;
 
+mod create;
+
+pub use self::create::CreateStringTable;
+
 #[derive(Debug, Clone)]
 pub struct StringTables(pub Vec<(String, StringTablePair)>);
 
@@ -68,6 +72,14 @@ impl StringTable {
 			capacity: Some(capacity),
 			fixed_extra_size
 		}
+	}
+
+	pub fn fixed_extra_size(&self) -> Option<u8> {
+		self.fixed_extra_size
+	}
+
+	pub fn capacity(&self) -> Option<usize> {
+		self.capacity
 	}
 
 	pub fn parse<R>(bits: &mut BitReader<R>) -> Self where R: Read {

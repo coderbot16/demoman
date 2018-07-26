@@ -7,7 +7,8 @@ use std::io::Read;
 type Bits = Vec<u8>;
 type EntityId = u16;
 
-enum PacketKind {
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+pub enum PacketKind {
 	Nop,
 	Disconnect,
 	TransferFile,
@@ -26,11 +27,11 @@ enum PacketKind {
 	VoiceData,
 	HltvControl,
 	PlaySound,
-	SetView,
+	SetEntityView,
 	FixAngle,
 	CrosshairAngle,
 	Decal,
-	TerrainModification,
+	TerrainMod,
 	UserMessage,
 	EntityMessage,
 	GameEvent,
@@ -40,6 +41,46 @@ enum PacketKind {
 	PluginMenu,
 	GameEventList,
 	GetCvar
+}
+
+impl PacketKind {
+	pub fn from_id(id: u8) -> Option<Self> {
+		Some(match id {
+			0  => PacketKind::Nop,
+			1  => PacketKind::Disconnect,
+			2  => PacketKind::TransferFile,
+			3  => PacketKind::Tick,
+			4  => PacketKind::StringCommand,
+			5  => PacketKind::SetCvars,
+			6  => PacketKind::SignonState,
+			7  => PacketKind::Print,
+			8  => PacketKind::ServerInfo,
+			9  => PacketKind::DataTable,
+			10 => PacketKind::ClassInfo,
+			11 => PacketKind::Pause,
+			12 => PacketKind::CreateStringTable,
+			13 => PacketKind::UpdateStringTable,
+			14 => PacketKind::VoiceInit,
+			15 => PacketKind::VoiceData,
+			16 => PacketKind::HltvControl,
+			17 => PacketKind::PlaySound,
+			18 => PacketKind::SetEntityView,
+			19 => PacketKind::FixAngle,
+			20 => PacketKind::CrosshairAngle,
+			21 => PacketKind::Decal,
+			22 => PacketKind::TerrainMod,
+			23 => PacketKind::UserMessage,
+			24 => PacketKind::EntityMessage,
+			25 => PacketKind::GameEvent,
+			26 => PacketKind::Entities,
+			27 => PacketKind::TempEntities,
+			28 => PacketKind::Prefetch,
+			29 => PacketKind::PluginMenu,
+			30 => PacketKind::GameEventList,
+			31 => PacketKind::GetCvar,
+			_ => return None
+		})
+	}
 }
 
 enum Packet {
@@ -55,13 +96,13 @@ enum Packet {
 	DataTable,           // TODO
 	ClassInfo            (ClassInfo),
 	Pause,               // TODO
-	CreateStringTable,   // TODO
+	CreateStringTable    (self::string_table::CreateStringTable),
 	UpdateStringTable,   // TODO
 	VoiceInit            (VoiceInit),
 	VoiceData            (VoiceData),
 	HltvControl,         // UNUSED
 	PlaySound            (PlaySound),
-	SetView              (EntityId),
+	SetEntityView        (EntityId),
 	FixAngle,            // TODO
 	CrosshairAngle,      // TODO
 	Decal                (Decal),

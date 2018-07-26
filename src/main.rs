@@ -8,9 +8,9 @@ use dem::demo::header::{self, DemoHeader};
 use dem::demo::bits::BitReader;
 use dem::demo::usercmd::{UserCmdDelta, PositionUpdate};
 use dem::demo::data_table::DataTables;
-use dem::packets::{TransferFile, Tick, SignonState, ClassInfo, Decal};
+use dem::packets::{PacketKind, TransferFile, Tick, SignonState, ClassInfo, Decal};
 use dem::packets::game_events::GameEventList;
-use dem::packets::string_table::StringTables;
+use dem::packets::string_table::{StringTables, CreateStringTable};
 use dem::demo::frame::{Frame, FramePayload};
 use dem::packets::string_table::StringTable;
 use dem::packets;
@@ -134,97 +134,37 @@ fn parse_update(mut data: Vec<u8>, demo: &DemoHeader) {
 
 	while bits.remaining_bits() >= 6 {
 		let id = bits.read_bits(6);
-		print!("  Packet ID: {} | ", id);
 
-		match id {
-			0 => println!("Nop"),
-			2 => println!("{:?}", TransferFile::parse(&mut bits)),
-			3 => println!("{:?}", Tick::parse(&mut bits)),
-			4 => println!("StringCommand({:?})", bits.read_string()),
-			5 => {
+		let kind = PacketKind::from_id(id as u8).expect("Packet ID cannot be greater than 31");
+
+		print!("  {:>17} | ", format!("{:?}", kind));
+
+		match kind {
+			PacketKind::Nop               => println!("Nop"),
+			PacketKind::Disconnect        => unimplemented!(),
+			PacketKind::TransferFile      => println!("{:?}", TransferFile::parse(&mut bits)),
+			PacketKind::Tick              => println!("{:?}", Tick::parse(&mut bits)),
+			PacketKind::StringCommand     => println!("{:?}", bits.read_string()),
+			PacketKind::SetCvars          => {
 				let count = bits.read_u8();
-				println!("SetCvars | {} cvars", count);
+				println!("{} cvars", count);
 
 				for _ in 0..count {
-					println!("    {:?} = {:?}", bits.read_string().unwrap(), bits.read_string().unwrap());
+					println!("  {:>17} : {:?} = {:?}", "", bits.read_string().unwrap(), bits.read_string().unwrap());
 				}
 			},
-			6 => println!("{:?}", SignonState::parse(&mut bits)),
-			7 => println!("Print({:?})", bits.read_string()),
-			8 => println!("{:?}", packets::ServerInfo::parse(&mut bits)),
-			10 => println!("{:?}", ClassInfo::parse(&mut bits)),
-			12 => {
-				let name = bits.read_string().unwrap();
-				let max_entries = bits.read_u16();
+			PacketKind::SignonState       => println!("{:?}", SignonState::parse(&mut bits)),
+			PacketKind::Print             => println!("Print({:?})", bits.read_string()),
+			PacketKind::ServerInfo        => println!("{:?}", packets::ServerInfo::parse(&mut bits)),
+			PacketKind::DataTable         => unimplemented!(),
+			PacketKind::ClassInfo         => println!("{:?}", ClassInfo::parse(&mut bits)),
+			PacketKind::Pause             => unimplemented!(),
+			PacketKind::CreateStringTable => {
+				let create = CreateStringTable::parse(&mut bits);
 
-				assert_ne!(max_entries, 0);
-
-				let index_bits = (16 - max_entries.leading_zeros()) as u8 - 1;
-				let entries = bits.read_bits(index_bits + 1) as u16;
-				let bits_len = bits.read_var_u32();
-
-				// Size and Bits Size
-				let fixed_userdata_size = if bits.read_bit()  {
-					Some((bits.read_bits(12) as u16, bits.read_bits(4) as u8))
-				} else {
-					None
-				};
-
-				println!("CreateStringTable | Table: {}, Entries: {} / {} ({} index bits), Fixed Userdata Size: {:?}, Bits: {}", name, entries, max_entries, index_bits, fixed_userdata_size, bits_len);
-
-				let mut table = StringTable::create(entries as usize, max_entries as usize, fixed_userdata_size.map(|(bytes, bits)| bits));
-
-				let start_rem_bits = bits.remaining_bits();
-
-				if bits.read_bit() {
-					let uncompressed_size = bits.read_u32();
-					let compressed_size = bits.read_u32();
-
-					assert!(compressed_size > 4);
-
-					let compressed_size = compressed_size - 4;
-					let magic = bits.read_u32().swap_bytes();
-
-					// 'SNAP' in big-endian
-					const SNAP: u32 = 0x534E4150;
-
-					assert_eq!(magic, SNAP, "Unexpected String Table compression magic: expected 0x534E4150 ('SNAP')");
-
-					//println!("  Using snappy | uncompressed bytes: {}, compressed bytes: {}", uncompressed_size, compressed_size);
-
-					let mut compressed = Vec::with_capacity(compressed_size as usize);
-					for _ in 0..compressed_size {
-						compressed.push(bits.read_u8());
-					}
-
-					let mut snappy = snap::Decoder::new();
-					let uncompressed = snappy.decompress_vec(&compressed).expect("invalid snappy data");
-
-					let mut cursor = Cursor::new(&uncompressed);
-					let mut bits = BitReader::new(&mut cursor, uncompressed_size as usize);
-
-					table.update(&mut bits, entries);
-				} else {
-					table.update(&mut bits, entries);
-				};
-
-				/*use dem::packets::string_table::Extra;
-
-				for (index, &(ref string, ref extra)) in table.strings.iter().enumerate() {
-					print!("    #{}: {} ", index, string);
-					match extra {
-						&Extra::Bytes(ref bytes) => println!("= {:?}", bytes),
-						&Extra::Bits { count, data } => println!("= {}", data),
-						&Extra::None => println!()
-					}
-				}*/
-
-				// +1 accounts for the compression/no compression bit that is NOT counted in the bits len normally.
-				assert_eq!(start_rem_bits - bits.remaining_bits(), (bits_len) as usize + 1, "Unexpected amount of bits read!");
-
-				continue;
+				println!("Table: {}, Entries: {} / {:?}, Fixed Userdata Size: {:?}", create.name, create.table.strings.len(), create.table.capacity(), create.table.fixed_extra_size());
 			},
-			13 => {
+			PacketKind::UpdateStringTable => {
 				// TODO: Broken
 
 				let index_bits = 0;
@@ -238,32 +178,31 @@ fn parse_update(mut data: Vec<u8>, demo: &DemoHeader) {
 
 				let bits_len = bits.read_bits(20) as u16;
 
-				println!("UpdateStringTable | Table: {}, Entries: {}, Bits: {}", table_id, entries, bits_len);
+				println!("Table: {}, Entries: {}, Bits: {}", table_id, entries, bits_len);
 
 				for _ in 0..bits_len {
 					bits.read_bit();
 				}
 			},
-			14 => {
+			PacketKind::VoiceInit         => {
 				// TODO: Changed recently: Medics demo has different format...
 
-				println!("VoiceInit | Codec: {:?}, Quality: {}, ???: {}", bits.read_string(), bits.read_u8(), bits.read_u16());
+				println!("Codec: {:?}, Quality: {}, ???: {}", bits.read_string(), bits.read_u8(), bits.read_u16());
 			},
-			15 => {
+			PacketKind::VoiceData         => {
 				let client_sender = bits.read_u8();
 				let proximity = bits.read_u8();
 
 				let bits_len = bits.read_u16();
 
-				println!("VoiceData | Sender: {}, Proximity: {}, Bits: {}", client_sender, proximity, bits_len);
+				println!("Sender: {}, Proximity: {}, Bits: {}", client_sender, proximity, bits_len);
 
 				for _ in 0..bits_len {
 					bits.read_bit();
 				}
 			},
-			17 => {
-				print!("Sound | ");
-
+			PacketKind::HltvControl      => unimplemented!(),
+			PacketKind::PlaySound        => {
 				let reliable = bits.read_bit();
 
 				if reliable {
@@ -285,8 +224,8 @@ fn parse_update(mut data: Vec<u8>, demo: &DemoHeader) {
 					println!("Unreliable: {} sounds, {} bits", sounds, bit_len);
 				};
 			},
-			18 => println!("SetEntityView({})", bits.read_bits(11)),
-			19 => {
+			PacketKind::SetEntityView    => println!("Entity: {}", bits.read_bits(11)),
+			PacketKind::FixAngle         => {
 				// TODO: BROKEN
 
 				let relative = bits.read_bit();
@@ -303,9 +242,9 @@ fn parse_update(mut data: Vec<u8>, demo: &DemoHeader) {
 					(angles.2 as f32) * 360.0 / 65536.0
 				);
 
-				println!("FixAngles | Relative: {}, (degrees): {:?} [raw: {:?}]", relative, degrees, angles);
+				println!("Relative: {}, (degrees): {:?} [raw: {:?}]", relative, degrees, angles);
 			},
-			20 => {
+			PacketKind::CrosshairAngle   => {
 				// TODO: BROKEN
 
 				let angles = (
@@ -322,46 +261,47 @@ fn parse_update(mut data: Vec<u8>, demo: &DemoHeader) {
 
 				println!("Angles (degrees): {:?} [raw: {:?}]", degrees, angles);
 			},
-			21 => println!("{:?}", Decal::parse(&mut bits)),
-			23 => {
+			PacketKind::Decal            => println!("{:?}", Decal::parse(&mut bits)),
+			PacketKind::TerrainMod       => unimplemented!(),
+			PacketKind::UserMessage      => {
 				let kind = bits.read_u8();
 				let bits_len = bits.read_bits(11) as u16;
 
-				println!("UserMessage | Kind: {}, Bits: {}", kind, bits_len);
+				println!("Kind: {}, Bits: {}", kind, bits_len);
 
 				for _ in 0..bits_len {
 					bits.read_bit();
 				}
 			},
-			24 => {
+			PacketKind::EntityMessage    => {
 				let entity = bits.read_bits(11) as u16;
 				let class = bits.read_bits(9) as u16;
 
 				let bits_len = bits.read_bits(11) as u16;
 
-				println!("EntityMessage | Entity: {}, Class: {}, Bits: {}", entity, class, bits_len);
+				println!("Entity: {}, Class: {}, Bits: {}", entity, class, bits_len);
 
 				for _ in 0..bits_len {
 					bits.read_bit();
 				}
 			},
-			25 => {
+			PacketKind::GameEvent        => {
 				let bits_len = bits.read_bits(11);
 
 				if bits_len < 9 {
-					println!("GameEvent | Error: Too small! Bits: {}", bits_len);
+					println!("Error: Too small! Bits: {}", bits_len);
 					break;
 				}
 
 				let id = bits.read_bits(9);
 
-				println!("GameEvent | Event ID: {}, Bits: {}", id, bits_len);
+				println!("Event ID: {}, Bits: {}", id, bits_len);
 
 				for _ in 0..bits_len-9 {
 					bits.read_bit();
 				}
 			},
-			26 => {
+			PacketKind::Entities         => {
 				let max_entries = bits.read_bits(11) as u16;
 
 				let delta_from_tick = if bits.read_bit() {
@@ -375,7 +315,7 @@ fn parse_update(mut data: Vec<u8>, demo: &DemoHeader) {
 				let bits_len = bits.read_bits(20);
 				let update_baseline = bits.read_bit();
 
-				println!("Entities | Entries: {} updated / {} max, Baseline: {} Update Baseline: {}, Delta From Tick: {:?}, Bits: {}", updated, max_entries, baseline, update_baseline, delta_from_tick, bits_len);
+				println!("Entries: {} updated / {} max, Baseline: {} Update Baseline: {}, Delta From Tick: {:?}, Bits: {}", updated, max_entries, baseline, update_baseline, delta_from_tick, bits_len);
 
 				for _ in 0..bits_len {
 					bits.read_bit();
@@ -430,26 +370,26 @@ fn parse_update(mut data: Vec<u8>, demo: &DemoHeader) {
 
 				//break;
 			},
-			27 => {
+			PacketKind::TempEntities     => {
 				let count = bits.read_u8();
 				let bits_len = bits.read_var_u32();
 
-				println!("TempEntities | Count: {}, Bits: {}", count, bits_len);
+				println!("Count: {}, Bits: {}", count, bits_len);
 
 				for _ in 0..bits_len {
 					bits.read_bit();
 				}
 			},
-			28 => {
-				println!("Prefetch | ???: {}, ID: {}", bits.read_bit(), bits.read_bits(13));
+			PacketKind::Prefetch         => {
+				println!("???: {}, ID: {}", bits.read_bit(), bits.read_bits(13));
 			},
-			29 => {
+			PacketKind::PluginMenu       => {
 				// TODO: BROKEN
 
 				let kind = bits.read_u16();
 				let len = bits.read_u16();
 
-				println!("Menu kind: {}, len: {}", kind, len);
+				println!("Kind: {}, len: {}", kind, len);
 
 				for _ in 0..len {
 					print!("{} ", bits.read_u8());
@@ -458,21 +398,17 @@ fn parse_update(mut data: Vec<u8>, demo: &DemoHeader) {
 				println!("  Don't know how to handle a Menu!");
 				break;
 			},
-			30 => {
+			PacketKind::GameEventList    => {
 				let event_list = GameEventList::parse(&mut bits).0;
 
-				println!("GameEventList | {} events not shown", event_list.len());
+				println!("{} events not shown", event_list.len());
 			},
-			31 => {
+			PacketKind::GetCvar          => {
 				// TODO: BROKEN?
 
-				println!("GetCVarValue: cookie: {}, cvar: {:?}", bits.read_u32(), bits.read_string());
+				println!("Cookie: {}, CVar: {:?}", bits.read_u32(), bits.read_string());
 
 				println!("  Don't know how to handle a GetCvarValue!");
-				break;
-			},
-			_ => {
-				println!("Unknown");
 				break;
 			}
 		}
