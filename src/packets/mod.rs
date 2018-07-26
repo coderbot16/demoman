@@ -89,7 +89,7 @@ enum Packet {
 	TransferFile         (TransferFile),
 	Tick                 (Tick),
 	StringCommand        (String),
-	SetCvars,            // TODO
+	SetCvars             (SetCvars),
 	SignonState          (SignonState),
 	Print                (String),
 	ServerInfo           (ServerInfo),
@@ -153,6 +153,22 @@ impl Tick {
 			fixed_time: bits.read_u16(),
 			fixed_time_stdev: bits.read_u16()
 		}
+	}
+}
+
+#[derive(Debug, Clone)]
+pub struct SetCvars(pub Vec<(String, String)>);
+
+impl SetCvars {
+	pub fn parse<R>(bits: &mut BitReader<R>) -> Self where R: Read {
+		let count = bits.read_u8();
+		let mut cvars = Vec::new();
+
+		for _ in 0..count {
+			cvars.push((bits.read_string().unwrap(), bits.read_string().unwrap()));
+		}
+
+		SetCvars(cvars)
 	}
 }
 

@@ -8,7 +8,7 @@ use dem::demo::header::{self, DemoHeader};
 use dem::demo::bits::BitReader;
 use dem::demo::usercmd::{UserCmdDelta, PositionUpdate};
 use dem::demo::data_table::DataTables;
-use dem::packets::{PacketKind, TransferFile, Tick, SignonState, ClassInfo, Decal};
+use dem::packets::{PacketKind, TransferFile, Tick, SetCvars, SignonState, ClassInfo, Decal};
 use dem::packets::game_events::GameEventList;
 use dem::packets::string_table::{StringTables, CreateStringTable};
 use dem::demo::frame::{Frame, FramePayload};
@@ -146,11 +146,12 @@ fn parse_update(mut data: Vec<u8>, demo: &DemoHeader) {
 			PacketKind::Tick              => println!("{:?}", Tick::parse(&mut bits)),
 			PacketKind::StringCommand     => println!("{:?}", bits.read_string()),
 			PacketKind::SetCvars          => {
-				let count = bits.read_u8();
-				println!("{} cvars", count);
+				let SetCvars(cvars) = SetCvars::parse(&mut bits);
 
-				for _ in 0..count {
-					println!("  {:>17} : {:?} = {:?}", "", bits.read_string().unwrap(), bits.read_string().unwrap());
+				println!("{} cvars", cvars.len());
+
+				for &(ref cvar, ref value) in &cvars {
+					println!("  {:>17} : {:?} = {:?}", "", cvar, value);
 				}
 			},
 			PacketKind::SignonState       => println!("{:?}", SignonState::parse(&mut bits)),
@@ -413,8 +414,6 @@ fn parse_update(mut data: Vec<u8>, demo: &DemoHeader) {
 			}
 		}
 	}
-
-	println!("  Trailing Bits: {}", bits.remaining_bits());
 
 	if bits.remaining_bits() >= 6 {
 		println!(" === SOME PACKETS NOT PARSED ==");
