@@ -29,7 +29,7 @@ pub enum Kind {
 	F32,
 	I32,
 	I16,
-	I8,
+	U8,
 	Bool,
 	Unused
 }
@@ -42,7 +42,7 @@ impl Kind {
 			2 => Kind::F32,
 			3 => Kind::I32,
 			4 => Kind::I16,
-			5 => Kind::I8,
+			5 => Kind::U8,
 			6 => Kind::Bool,
 			7 => Kind::Unused,
 			_ => return None

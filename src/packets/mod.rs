@@ -96,7 +96,7 @@ enum Packet {
 	DataTable,           // TODO
 	ClassInfo            (ClassInfo),
 	Pause,               // TODO
-	CreateStringTable    (self::string_table::CreateStringTable),
+	CreateStringTable    (string_table::CreateStringTable),
 	UpdateStringTable,   // TODO
 	VoiceInit            (VoiceInit),
 	VoiceData            (VoiceData),
