@@ -4,9 +4,10 @@ pub mod string_table;
 use demo::bits::{BitReader, Bits};
 use std::io::Read;
 
-/// Only needed on old demos, appears to be v22 and below. V23 not checked though.
-pub const COMPATIBILITY_USE_FIXED_CREATESTRINGTABLE_LENGTH_FIELD: bool = true;
-/// True in modern demos. v22 and below (v23?) don't have a type identifier, however.
+/// Version 23 and below use a fixed size bit length field instead of a variable size one.
+pub const CREATESTRINGTABLE_LENGTH_FIELD_SIZE_IS_VARIABLE: bool = false;
+/// Protocol version 22 and below lack a type identifier on the Prefetch packet.
+/// However, all modern versions have this type identifier.
 pub const PREFETCH_HAS_TYPE_IDENTIFIER: bool = false;
 
 type EntityId = u16;
@@ -360,7 +361,7 @@ impl CreateStringTable {
 
 		let index_bits = (16 - max_entries.leading_zeros()) as u8 - 1;
 		let entries = bits.read_bits(index_bits + 1) as u16;
-		let bits_len = if !COMPATIBILITY_USE_FIXED_CREATESTRINGTABLE_LENGTH_FIELD { bits.read_var_u32() } else { bits.read_bits(20) };
+		let bits_len = if CREATESTRINGTABLE_LENGTH_FIELD_SIZE_IS_VARIABLE { bits.read_var_u32() } else { bits.read_bits(20) };
 
 		// Size and Bits Size
 		let fixed_userdata_size = if bits.read_bit()  {

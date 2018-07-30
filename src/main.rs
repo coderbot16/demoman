@@ -26,8 +26,10 @@ use byteorder::{ReadBytesExt, LittleEndian};
 //const PATH: &str = "/home/coderbot/Programming/Rust IntelliJ/demoman/test_data/2013-02-19-ctf_haunt_b2.dem";
 const PATH: &str = "/home/coderbot/Programming/Rust IntelliJ/demoman/test_data/2012-06-29-Dustbowl.dem";
 
+/// This was changed within version 24, which potentially breaks backwards compatibility.
 const USE_OLD_VOICEINIT: bool = true;
-const USE_OLD_PROTOCOL_22: bool = true;
+/// Version 23 and below use a fixed size bit length field instead of a variable size one.
+const TEMPENTITIES_LENGTH_FIELD_SIZE_IS_VARIABLE: bool = false;
 
 fn main() {
 	let mut file = BufReader::new(File::open(PATH).unwrap());
@@ -302,7 +304,7 @@ fn parse_update(data: Vec<u8>, demo: &DemoHeader) {
 			},
 			PacketKind::TempEntities     => {
 				let count = bits.read_u8();
-				let bits_len = if !USE_OLD_PROTOCOL_22 { bits.read_var_u32() } else {bits.read_bits(17) };
+				let bits_len = if TEMPENTITIES_LENGTH_FIELD_SIZE_IS_VARIABLE { bits.read_var_u32() } else {bits.read_bits(17) };
 
 				println!("Count: {}, Bits: {}", count, bits_len);
 
