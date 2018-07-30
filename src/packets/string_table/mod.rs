@@ -4,7 +4,7 @@ use std::io::Read;
 
 mod create;
 
-pub use self::create::CreateStringTable;
+pub use self::create::NewStringTable;
 
 #[derive(Debug, Clone)]
 pub struct StringTables(pub Vec<(String, StringTablePair)>);

@@ -4,6 +4,11 @@ pub mod string_table;
 use demo::bits::{BitReader, Bits};
 use std::io::Read;
 
+/// Only needed on old demos, appears to be v22 and below. V23 not checked though.
+pub const COMPATIBILITY_USE_FIXED_CREATESTRINGTABLE_LENGTH_FIELD: bool = true;
+/// True in modern demos. v22 and below (v23?) don't have a type identifier, however.
+pub const PREFETCH_HAS_TYPE_IDENTIFIER: bool = false;
+
 type EntityId = u16;
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
@@ -95,7 +100,7 @@ pub enum Packet {
 	DataTable,           // TODO
 	ClassInfo            (ClassInfo),
 	Pause,               // TODO
-	CreateStringTable    (string_table::CreateStringTable),
+	CreateStringTable    (CreateStringTable),
 	UpdateStringTable    (UpdateStringTable),
 	VoiceInit            (VoiceInit),
 	VoiceData            (VoiceData),
@@ -132,7 +137,7 @@ impl Packet {
 			PacketKind::DataTable         => unimplemented!(),
 			PacketKind::ClassInfo         => Packet::ClassInfo        (ClassInfo::parse(bits)),
 			PacketKind::Pause             => unimplemented!(),
-			PacketKind::CreateStringTable => Packet::CreateStringTable(string_table::CreateStringTable::parse(bits)),
+			PacketKind::CreateStringTable => Packet::CreateStringTable(CreateStringTable::parse(bits)),
 			PacketKind::UpdateStringTable => Packet::UpdateStringTable(UpdateStringTable::parse(bits)),
 			PacketKind::VoiceInit         => Packet::VoiceInit        (VoiceInit::parse(bits)),
 			PacketKind::VoiceData         => Packet::VoiceData        (VoiceData::parse(bits)),
@@ -333,6 +338,42 @@ impl ClassInfo {
 			classes,
 			info: None
 		}
+	}
+}
+
+#[derive(Debug, Clone)]
+pub struct CreateStringTable {
+	pub name: String,
+	pub max_entries: u16,
+	pub entries: u16,
+	pub fixed_userdata_size: Option<(u16, u8)>,
+	pub compressed: bool,
+	pub data: Bits
+}
+
+impl CreateStringTable {
+	pub fn parse<R>(bits: &mut BitReader<R>) -> Self where R: Read {
+		let name = bits.read_string().unwrap();
+		let max_entries = bits.read_u16();
+
+		assert_ne!(max_entries, 0);
+
+		let index_bits = (16 - max_entries.leading_zeros()) as u8 - 1;
+		let entries = bits.read_bits(index_bits + 1) as u16;
+		let bits_len = if !COMPATIBILITY_USE_FIXED_CREATESTRINGTABLE_LENGTH_FIELD { bits.read_var_u32() } else { bits.read_bits(20) };
+
+		// Size and Bits Size
+		let fixed_userdata_size = if bits.read_bit()  {
+			Some((bits.read_bits(12) as u16, bits.read_bits(4) as u8))
+		} else {
+			None
+		};
+
+		let compressed = bits.read_bit();
+
+		let data = Bits::copy_into(bits, bits_len as usize);
+
+		CreateStringTable { name, max_entries, entries, fixed_userdata_size, compressed, data }
 	}
 }
 
@@ -566,7 +607,7 @@ pub struct Prefetch {
 impl Prefetch {
 	pub fn parse<R>(bits: &mut BitReader<R>) -> Self where R: Read {
 		Prefetch {
-			unknown: bits.read_bit(),
+			unknown: if PREFETCH_HAS_TYPE_IDENTIFIER { bits.read_bit() } else { false },
 			id:      bits.read_bits(13) as u16
 		}
 	}

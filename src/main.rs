@@ -7,9 +7,9 @@ use dem::demo::header::{self, DemoHeader};
 use dem::demo::bits::{BitReader, Bits};
 use dem::demo::usercmd::{UserCmdDelta, PositionUpdate};
 use dem::demo::data_table::DataTables;
-use dem::packets::{PacketKind, TransferFile, Tick, SetCvars, SignonState, ClassInfo, Decal, VoiceInit, Prefetch, VoiceData, PlaySound, UserMessage, EntityMessage, GameEvent, UpdateStringTable, Entities, TempEntities, FixAngle};
+use dem::packets::{PacketKind, TransferFile, Tick, SetCvars, SignonState, ClassInfo, Decal, VoiceInit, Prefetch, VoiceData, PlaySound, UserMessage, EntityMessage, GameEvent, CreateStringTable, UpdateStringTable, Entities, TempEntities, FixAngle};
 use dem::packets::game_events::GameEventList;
-use dem::packets::string_table::{StringTables, CreateStringTable};
+use dem::packets::string_table::{StringTables, NewStringTable};
 use dem::demo::frame::{Frame, FramePayload};
 use dem::packets::string_table::StringTable;
 use dem::packets;
@@ -25,7 +25,9 @@ use byteorder::{ReadBytesExt, LittleEndian};
 //const PATH: &str = "/home/coderbot/Programming/Rust IntelliJ/demoman/test_data/2013-04-10-Granary.dem";
 //const PATH: &str = "/home/coderbot/Programming/Rust IntelliJ/demoman/test_data/2013-02-19-ctf_haunt_b2.dem";
 const PATH: &str = "/home/coderbot/Programming/Rust IntelliJ/demoman/test_data/2012-06-29-Dustbowl.dem";
+
 const USE_OLD_VOICEINIT: bool = true;
+const USE_OLD_PROTOCOL_22: bool = true;
 
 fn main() {
 	let mut file = BufReader::new(File::open(PATH).unwrap());
@@ -153,9 +155,13 @@ fn parse_update(data: Vec<u8>, demo: &DemoHeader) {
 			PacketKind::ClassInfo         => println!("{:?}", ClassInfo::parse(&mut bits)),
 			PacketKind::Pause             => unimplemented!(),
 			PacketKind::CreateStringTable => {
-				let create = CreateStringTable::parse(&mut bits);
+				let packet = CreateStringTable::parse(&mut bits);
 
-				println!("Table: {}, Entries: {} / {:?}, Fixed Userdata Size: {:?}", create.name, create.table.strings.len(), create.table.capacity(), create.table.fixed_extra_size());
+				println!("Table: {}, Entries: {} / {:?}, Fixed Userdata Size: {:?}, Bits: {}", packet.name, packet.entries, packet.max_entries, packet.fixed_userdata_size, packet.data.bits_len());
+
+				/*let NewStringTable { name, table } = NewStringTable::from_packet(packet);
+
+				println!("Table: {}, Entries: {} / {:?}, Fixed Userdata Size: {:?}", name, table.strings.len(), table.capacity(), table.fixed_extra_size());*/
 			},
 			PacketKind::UpdateStringTable => {
 				let update = UpdateStringTable::parse(&mut bits);
@@ -296,7 +302,7 @@ fn parse_update(data: Vec<u8>, demo: &DemoHeader) {
 			},
 			PacketKind::TempEntities     => {
 				let count = bits.read_u8();
-				let bits_len = bits.read_var_u32();
+				let bits_len = if !USE_OLD_PROTOCOL_22 { bits.read_var_u32() } else {bits.read_bits(17) };
 
 				println!("Count: {}, Bits: {}", count, bits_len);
 
