@@ -3,24 +3,26 @@ extern crate nom;
 extern crate byteorder;
 extern crate snap;
 
-use ::nom::IResult;
 use dem::demo::header::{self, DemoHeader};
-use dem::demo::bits::BitReader;
+use dem::demo::bits::{BitReader, Bits};
 use dem::demo::usercmd::{UserCmdDelta, PositionUpdate};
 use dem::demo::data_table::DataTables;
-use dem::packets::{PacketKind, TransferFile, Tick, SetCvars, SignonState, ClassInfo, Decal};
+use dem::packets::{PacketKind, TransferFile, Tick, SetCvars, SignonState, ClassInfo, Decal, VoiceInit, Prefetch, VoiceData, PlaySound, UserMessage, EntityMessage, GameEvent, UpdateStringTable, Entities, TempEntities};
 use dem::packets::game_events::GameEventList;
 use dem::packets::string_table::{StringTables, CreateStringTable};
 use dem::demo::frame::{Frame, FramePayload};
 use dem::packets::string_table::StringTable;
 use dem::packets;
 
-use std::io::{BufReader, Read, Seek, SeekFrom, Cursor};
+use std::io::{BufReader, Read, Seek, SeekFrom};
 use std::fs::File;
 use byteorder::{ReadBytesExt, LittleEndian};
 
 //const PATH: &str = "/home/coderbot/Source/HowToMedicFortress_coderbot_1200_USA.dem";
-const PATH: &str = "/home/coderbot/.steam/steam/steamapps/common/Team Fortress 2/tf/demos/2017-12-23_16-43-13.dem";
+//const PATH: &str = "/home/coderbot/.steam/steam/steamapps/common/Team Fortress 2/tf/demos/2017-12-23_16-43-13.dem";
+//const PATH: &str = "/home/coderbot/.steam/steam/steamapps/common/Team Fortress 2/tf/demos/2018-07-28_22-43-39.dem";
+const PATH: &str = "/home/coderbot/.steam/steam/steamapps/common/Team Fortress 2/tf/demos/2016-12-07_18-25-34.dem";
+const USE_OLD_VOICEINIT: bool = true;
 
 fn main() {
 	let mut file = BufReader::new(File::open(PATH).unwrap());
@@ -107,28 +109,9 @@ for table in &tables.tables {
 	println!();
 }*/
 
-fn parse_update(mut data: Vec<u8>, demo: &DemoHeader) {
-	/*for alignment in 0..8 {
-		let len = data.len();
-		let mut cursor = Cursor::new(&mut data);
-		let mut bits = BitReader::new(&mut cursor, len);
-
-		let mut file = File::create(format!("align-{}", alignment)).unwrap();
-
-		bits.read_bits(alignment);
-
-		while bits.remaining_bits() >= 8 {
-			use byteorder::WriteBytesExt;;
-
-			file.write_u8(bits.read_u8()).unwrap();
-		}
-	}
-
-	::std::process::exit(0);*/
-
-	let len = data.len();
-	let mut cursor = Cursor::new(&mut data);
-	let mut bits = BitReader::new(&mut cursor, len);
+fn parse_update(data: Vec<u8>, demo: &DemoHeader) {
+	let data = Bits::from_bytes(data);
+	let mut bits = data.reader();
 
 	assert!(demo.network_protocol > 10, "Network protocols less than 10 do not have fixed_time and fixed_time_stdev in Tick, this is not handled yet!");
 
@@ -140,7 +123,13 @@ fn parse_update(mut data: Vec<u8>, demo: &DemoHeader) {
 		print!("  {:>17} | ", format!("{:?}", kind));
 
 		match kind {
-			PacketKind::Nop               => println!("Nop"),
+			PacketKind::Nop               => {
+				if bits.remaining_bits() >= 6 {
+					println!("[Warning: Nop packet found in the middle of an update, this usually means that a packet was improperly parsed]");
+				} else {
+					println!("Nop");
+				}
+			},
 			PacketKind::Disconnect        => unimplemented!(),
 			PacketKind::TransferFile      => println!("{:?}", TransferFile::parse(&mut bits)),
 			PacketKind::Tick              => println!("{:?}", Tick::parse(&mut bits)),
@@ -166,64 +155,44 @@ fn parse_update(mut data: Vec<u8>, demo: &DemoHeader) {
 				println!("Table: {}, Entries: {} / {:?}, Fixed Userdata Size: {:?}", create.name, create.table.strings.len(), create.table.capacity(), create.table.fixed_extra_size());
 			},
 			PacketKind::UpdateStringTable => {
-				// TODO: Broken
+				let update = UpdateStringTable::parse(&mut bits);
 
-				let index_bits = 0;
-
-				let table_id = bits.read_bits(5) as u8;
-				let entries = if bits.read_bit() {
-					bits.read_u16()
-				} else {
-					1
-				};
-
-				let bits_len = bits.read_bits(20) as u16;
-
-				println!("Table: {}, Entries: {}, Bits: {}", table_id, entries, bits_len);
-
-				for _ in 0..bits_len {
-					bits.read_bit();
-				}
+				println!("Table: {}, Entries: {}, Bits: {}", update.table_id, update.entries, update.data.bits_len());
 			},
 			PacketKind::VoiceInit         => {
-				// TODO: Changed recently: Medics demo has different format...
+				if USE_OLD_VOICEINIT {
+					/// VoiceInit message that is missing an extra 16-bit field.
+					#[derive(Debug, Clone)]
+					pub struct VoiceInitOld {
+						pub codec: String,
+						pub quality: u8
+					}
 
-				println!("Codec: {:?}, Quality: {}, ???: {}", bits.read_string(), bits.read_u8(), bits.read_u16());
+					impl VoiceInitOld {
+						pub fn parse<R>(bits: &mut BitReader<R>) -> Self where R: Read {
+							VoiceInitOld {
+								codec:   bits.read_string().unwrap(),
+								quality: bits.read_u8()
+							}
+						}
+					}
+
+					println!("{:?}", VoiceInitOld::parse(&mut bits));
+				} else {
+					println!("{:?}", VoiceInit::parse(&mut bits));
+				}
+
+				// TODO: Changed recently: Medics demo has different format...
 			},
 			PacketKind::VoiceData         => {
-				let client_sender = bits.read_u8();
-				let proximity = bits.read_u8();
+				let voice_data = VoiceData::parse(&mut bits);
 
-				let bits_len = bits.read_u16();
-
-				println!("Sender: {}, Proximity: {}, Bits: {}", client_sender, proximity, bits_len);
-
-				for _ in 0..bits_len {
-					bits.read_bit();
-				}
+				println!("Sender: {}, Proximity: {}, Bits: {}", voice_data.sender, voice_data.proximity, voice_data.data.bits_len());
 			},
 			PacketKind::HltvControl      => unimplemented!(),
-			PacketKind::PlaySound        => {
-				let reliable = bits.read_bit();
-
-				if reliable {
-					let bit_len = bits.read_u8();
-
-					for _ in 0..bit_len {
-						bits.read_bit();
-					}
-
-					println!("Reliable: {} bits", bit_len);
-				} else {
-					let sounds = bits.read_u8();
-					let bit_len = bits.read_u16();
-
-					for _ in 0..bit_len {
-						bits.read_bit();
-					}
-
-					println!("Unreliable: {} sounds, {} bits", sounds, bit_len);
-				};
+			PacketKind::PlaySound        => match PlaySound::parse(&mut bits) {
+				PlaySound::Reliable(data)             => println!("Reliable: {} bits", data.bits_len()),
+				PlaySound::Unreliable { sounds, all } => println!("Unreliable: {} sounds, {} bits", sounds, all.bits_len())
 			},
 			PacketKind::SetEntityView    => println!("Entity: {}", bits.read_bits(11)),
 			PacketKind::FixAngle         => {
@@ -265,62 +234,31 @@ fn parse_update(mut data: Vec<u8>, demo: &DemoHeader) {
 			PacketKind::Decal            => println!("{:?}", Decal::parse(&mut bits)),
 			PacketKind::TerrainMod       => unimplemented!(),
 			PacketKind::UserMessage      => {
-				let kind = bits.read_u8();
-				let bits_len = bits.read_bits(11) as u16;
+				let user_message = UserMessage::parse(&mut bits);
 
-				println!("Kind: {}, Bits: {}", kind, bits_len);
-
-				for _ in 0..bits_len {
-					bits.read_bit();
-				}
+				println!("Channel: {}, Bits: {}", user_message.channel, user_message.data.bits_len());
 			},
 			PacketKind::EntityMessage    => {
-				let entity = bits.read_bits(11) as u16;
-				let class = bits.read_bits(9) as u16;
+				let entity_message = EntityMessage::parse(&mut bits);
 
-				let bits_len = bits.read_bits(11) as u16;
-
-				println!("Entity: {}, Class: {}, Bits: {}", entity, class, bits_len);
-
-				for _ in 0..bits_len {
-					bits.read_bit();
-				}
+				println!("Entity: {}, Class: {}, Bits: {}", entity_message.entity, entity_message.class, entity_message.data.bits_len());
 			},
 			PacketKind::GameEvent        => {
-				let bits_len = bits.read_bits(11);
+				let GameEvent(payload) = GameEvent::parse(&mut bits);
 
-				if bits_len < 9 {
-					println!("Error: Too small! Bits: {}", bits_len);
+				if payload.bits_len() < 9 {
+					println!("Error: Too small! Bits: {}", payload.bits_len());
 					break;
 				}
 
-				let id = bits.read_bits(9);
+				let id = payload.reader().read_bits(9);
 
-				println!("Event ID: {}, Bits: {}", id, bits_len);
-
-				for _ in 0..bits_len-9 {
-					bits.read_bit();
-				}
+				println!("Event ID: {}, Bits: {}", id, payload.bits_len());
 			},
 			PacketKind::Entities         => {
-				let max_entries = bits.read_bits(11) as u16;
+				let entities = Entities::parse(&mut bits);
 
-				let delta_from_tick = if bits.read_bit() {
-					Some(bits.read_u32())
-				} else {
-					None
-				};
-
-				let baseline = bits.read_bit();
-				let updated = bits.read_bits(11);
-				let bits_len = bits.read_bits(20);
-				let update_baseline = bits.read_bit();
-
-				println!("Entries: {} updated / {} max, Baseline: {} Update Baseline: {}, Delta From Tick: {:?}, Bits: {}", updated, max_entries, baseline, update_baseline, delta_from_tick, bits_len);
-
-				for _ in 0..bits_len {
-					bits.read_bit();
-				}
+				println!("Entries: {} updated / {} max, Baseline: {} Update Baseline: {}, Delta From Tick: {:?}, Bits: {}", entities.updated, entities.max_entries, entities.baseline, entities.update_baseline, entities.delta_from_tick, entities.data.bits_len());
 
 				/*#[derive(Debug, Eq, PartialEq)]
 				enum UpdateType {
@@ -381,9 +319,7 @@ fn parse_update(mut data: Vec<u8>, demo: &DemoHeader) {
 					bits.read_bit();
 				}
 			},
-			PacketKind::Prefetch         => {
-				println!("???: {}, ID: {}", bits.read_bit(), bits.read_bits(13));
-			},
+			PacketKind::Prefetch         => println!("{:?}", Prefetch::parse(&mut bits)),
 			PacketKind::PluginMenu       => {
 				// TODO: BROKEN
 

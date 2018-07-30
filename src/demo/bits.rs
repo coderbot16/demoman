@@ -1,17 +1,17 @@
-use std::io::{self, Read};
+use std::io::{self, Read, Cursor};
 use byteorder::{ReadBytesExt, LittleEndian};
 use std::string::FromUtf8Error;
 
-pub struct BitReader<'r, R> where R: 'r + Read {
-	input: &'r mut R,
+pub struct BitReader<R> where R: Read {
+	input: R,
 	remaining_bytes: usize,
 	bits: u32,
 	/// Available bits. Must always be above 0.
 	available: u8
 }
 
-impl<'r, R> BitReader<'r, R> where R: 'r + Read {
-	pub fn new(input: &'r mut R, max_bytes: usize) -> Self {
+impl<R> BitReader<R> where R: Read {
+	pub fn new(input: R, max_bytes: usize) -> Self {
 		let mut reader = BitReader {
 			input,
 			remaining_bytes: max_bytes,
@@ -244,7 +244,47 @@ impl<'r, R> BitReader<'r, R> where R: 'r + Read {
 		result
 	}
 
-	pub fn end(self) -> (&'r mut R, u8) {
+	pub fn end(self) -> (R, u8) {
 		(self.input, self.available)
+	}
+}
+
+#[derive(Debug, Clone)]
+pub struct Bits {
+	data: Vec<u8>,
+	trailing_bits: u8
+}
+
+impl Bits {
+	pub fn from_bytes(data: Vec<u8>) -> Self {
+		Bits { data, trailing_bits: 0 }
+	}
+
+	pub fn copy_into<R>(bits: &mut BitReader<R>, count: usize) -> Self where R: Read {
+		let trailing_bits = (count % 8) as u8;
+		let bytes = count / 8;
+
+		let mut data = Vec::with_capacity(bytes + if trailing_bits != 0 {1} else {0});
+
+		for _ in 0..bytes {
+			data.push(bits.read_u8());
+		}
+
+		if trailing_bits != 0 {
+			data.push(bits.read_bits(trailing_bits) as u8);
+		}
+
+		Bits { data, trailing_bits }
+	}
+
+	pub fn reader(&self) -> BitReader<Cursor<&Vec<u8>>> {
+		let len = self.data.len();
+		let cursor = Cursor::new(&self.data);
+
+		BitReader::new(cursor, len)
+	}
+
+	pub fn bits_len(&self) -> usize {
+		self.data.len() * 8 + (self.trailing_bits as usize)
 	}
 }

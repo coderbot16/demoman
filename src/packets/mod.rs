@@ -1,10 +1,9 @@
 pub mod game_events;
 pub mod string_table;
 
-use demo::bits::BitReader;
+use demo::bits::{BitReader, Bits};
 use std::io::Read;
 
-type Bits = Vec<u8>;
 type EntityId = u16;
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
@@ -83,7 +82,7 @@ impl PacketKind {
 	}
 }
 
-enum Packet {
+pub enum Packet {
 	Nop,
 	Disconnect,          // TODO
 	TransferFile         (TransferFile),
@@ -97,7 +96,7 @@ enum Packet {
 	ClassInfo            (ClassInfo),
 	Pause,               // TODO
 	CreateStringTable    (string_table::CreateStringTable),
-	UpdateStringTable,   // TODO
+	UpdateStringTable    (UpdateStringTable),
 	VoiceInit            (VoiceInit),
 	VoiceData            (VoiceData),
 	HltvControl,         // UNUSED
@@ -116,6 +115,45 @@ enum Packet {
 	PluginMenu,          // TODO
 	GameEventList        (game_events::GameEventList),
 	GetCvar              // TODO
+}
+
+impl Packet {
+	pub fn parse_with_kind<R>(bits: &mut BitReader<R>, kind: PacketKind) -> Self where R: Read {
+		match kind {
+			PacketKind::Nop               => Packet::Nop,
+			PacketKind::Disconnect        => unimplemented!(),
+			PacketKind::TransferFile      => Packet::TransferFile     (TransferFile::parse(bits)),
+			PacketKind::Tick              => Packet::Tick             (Tick::parse(bits)),
+			PacketKind::StringCommand     => Packet::StringCommand    (bits.read_string().unwrap()),
+			PacketKind::SetCvars          => Packet::SetCvars         (SetCvars::parse(bits)),
+			PacketKind::SignonState       => Packet::SignonState      (SignonState::parse(bits)),
+			PacketKind::Print             => Packet::Print            (bits.read_string().unwrap()),
+			PacketKind::ServerInfo        => Packet::ServerInfo       (ServerInfo::parse(bits)),
+			PacketKind::DataTable         => unimplemented!(),
+			PacketKind::ClassInfo         => Packet::ClassInfo        (ClassInfo::parse(bits)),
+			PacketKind::Pause             => unimplemented!(),
+			PacketKind::CreateStringTable => Packet::CreateStringTable(string_table::CreateStringTable::parse(bits)),
+			PacketKind::UpdateStringTable => Packet::UpdateStringTable(UpdateStringTable::parse(bits)),
+			PacketKind::VoiceInit         => Packet::VoiceInit        (VoiceInit::parse(bits)),
+			PacketKind::VoiceData         => Packet::VoiceData        (VoiceData::parse(bits)),
+			PacketKind::HltvControl       => unimplemented!(),
+			PacketKind::PlaySound         => Packet::PlaySound        (PlaySound::parse(bits)),
+			PacketKind::SetEntityView     => Packet::SetEntityView    (bits.read_bits(11) as u16),
+			PacketKind::FixAngle          => unimplemented!(),
+			PacketKind::CrosshairAngle    => unimplemented!(),
+			PacketKind::Decal             => Packet::Decal            (Decal::parse(bits)),
+			PacketKind::TerrainMod        => unimplemented!(),
+			PacketKind::UserMessage       => Packet::UserMessage      (UserMessage::parse(bits)),
+			PacketKind::EntityMessage     => Packet::EntityMessage    (EntityMessage::parse(bits)),
+			PacketKind::GameEvent         => Packet::GameEvent        (GameEvent::parse(bits)),
+			PacketKind::Entities          => unimplemented!(),
+			PacketKind::TempEntities      => unimplemented!(),
+			PacketKind::Prefetch          => Packet::Prefetch         (Prefetch::parse(bits)),
+			PacketKind::PluginMenu        => unimplemented!(),
+			PacketKind::GameEventList     => Packet::GameEventList    (game_events::GameEventList::parse(bits)),
+			PacketKind::GetCvar           => unimplemented!()
+		}
+	}
 }
 
 #[derive(Debug, Clone)]
@@ -299,22 +337,84 @@ impl ClassInfo {
 }
 
 #[derive(Debug, Clone)]
+pub struct UpdateStringTable {
+	pub table_id: u8,
+	pub entries:  u16,
+	pub data:     Bits
+}
+
+impl UpdateStringTable {
+	pub fn parse<R>(bits: &mut BitReader<R>) -> Self where R: Read {
+		UpdateStringTable {
+			table_id: bits.read_bits(5) as u8,
+			entries: if bits.read_bit() { bits.read_u16() } else { 1 },
+			data: {
+				let bits_len = bits.read_bits(20) as usize;
+				Bits::copy_into(bits, bits_len)
+			}
+		}
+	}
+}
+
+#[derive(Debug, Clone)]
 pub struct VoiceInit {
 	pub codec: String,
 	pub quality: u8,
 	pub unknown: u16
 }
 
+impl VoiceInit {
+	pub fn parse<R>(bits: &mut BitReader<R>) -> Self where R: Read {
+		VoiceInit {
+			codec:   bits.read_string().unwrap(),
+			quality: bits.read_u8(),
+			unknown: bits.read_u16()
+		}
+	}
+}
+
 #[derive(Debug, Clone)]
 pub struct VoiceData {
-	pub sender: u8,
-	pub data: Bits
+	pub sender:    u8,
+	pub proximity: u8,
+	pub data:      Bits
+}
+
+impl VoiceData {
+	pub fn parse<R>(bits: &mut BitReader<R>) -> Self where R: Read {
+		VoiceData {
+			sender: bits.read_u8(),
+			proximity: bits.read_u8(),
+			data: {
+				let len = bits.read_u16();
+
+				Bits::copy_into(bits, len as usize)
+			}
+		}
+	}
 }
 
 #[derive(Debug, Clone)]
 pub enum PlaySound {
-	Reliable(Bits),
+	Reliable   (Bits),
 	Unreliable { sounds: u8, all: Bits }
+}
+
+impl PlaySound {
+	pub fn parse<R>(bits: &mut BitReader<R>) -> Self where R: Read {
+		let reliable = bits.read_bit();
+
+		if reliable {
+			let bit_len = bits.read_u8();
+
+			PlaySound::Reliable(Bits::copy_into(bits, bit_len as usize))
+		} else {
+			let sounds = bits.read_u8();
+			let bit_len = bits.read_u16();
+
+			PlaySound::Unreliable { sounds, all: Bits::copy_into(bits, bit_len as usize) }
+		}
+	}
 }
 
 #[derive(Debug, Clone)]
@@ -345,26 +445,110 @@ impl Decal {
 
 #[derive(Debug, Clone)]
 pub struct UserMessage {
-	pub kind: u8,
-	pub data: Bits
+	pub channel: u8,
+	pub data:    Bits
+}
+
+impl UserMessage {
+	pub fn parse<R>(bits: &mut BitReader<R>) -> Self where R: Read {
+		UserMessage {
+			channel: bits.read_u8(),
+			data: {
+				let bits_len = bits.read_bits(11) as usize;
+				Bits::copy_into(bits, bits_len)
+			}
+		}
+	}
 }
 
 #[derive(Debug, Clone)]
 pub struct EntityMessage {
 	pub entity: EntityId,
-	pub class: u16,
-	pub data: Bits
+	pub class:  u16,
+	pub data:   Bits
+}
+
+impl EntityMessage {
+	pub fn parse<R>(bits: &mut BitReader<R>) -> Self where R: Read {
+		EntityMessage {
+			entity: bits.read_bits(11) as u16,
+			class:  bits.read_bits(9) as u16,
+			data: {
+				let bits_len = bits.read_bits(11) as usize;
+				Bits::copy_into(bits, bits_len)
+			}
+		}
+	}
+}
+
+// First 9 bits are the event ID
+#[derive(Debug, Clone)]
+pub struct GameEvent(pub Bits);
+
+impl GameEvent {
+	pub fn parse<R>(bits: &mut BitReader<R>) -> Self where R: Read {
+		let bits_len = bits.read_bits(11) as usize;
+
+		GameEvent(Bits::copy_into(bits, bits_len))
+	}
 }
 
 #[derive(Debug, Clone)]
-pub struct GameEvent {
-	pub id: u16,
+pub struct Entities {
+	pub max_entries: u16,
+	pub delta_from_tick: Option<u32>,
+	pub baseline: bool,
+	pub updated: u16,
+	pub update_baseline: bool,
 	pub data: Bits
+}
+
+impl Entities {
+	pub fn parse<R>(bits: &mut BitReader<R>) -> Self where R: Read {
+		let max_entries = bits.read_bits(11) as u16;
+
+		let delta_from_tick = if bits.read_bit() {
+			Some(bits.read_u32())
+		} else {
+			None
+		};
+
+		let baseline = bits.read_bit();
+		let updated = bits.read_bits(11) as u16;
+		let bits_len = bits.read_bits(20) as usize;
+		let update_baseline = bits.read_bit();
+
+		Entities {
+			max_entries,
+			delta_from_tick,
+			baseline,
+			updated,
+			update_baseline,
+			data: Bits::copy_into(bits, bits_len)
+		}
+	}
+}
+
+pub struct TempEntities;
+
+impl TempEntities {
+	pub fn parse<R>(bits: &mut BitReader<R>) -> Self where R: Read {
+		TempEntities
+	}
 }
 
 #[derive(Debug, Clone)]
 pub struct Prefetch {
+	// TODO: Appears to be a type identifier.
 	pub unknown: bool,
 	pub id: u16
 }
 
+impl Prefetch {
+	pub fn parse<R>(bits: &mut BitReader<R>) -> Self where R: Read {
+		Prefetch {
+			unknown: bits.read_bit(),
+			id:      bits.read_bits(13) as u16
+		}
+	}
+}

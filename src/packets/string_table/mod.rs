@@ -90,7 +90,7 @@ impl StringTable {
 			let string = bits.read_string().unwrap();
 
 			let data = if bits.read_bit() {
-				let data_size = (bits.read_u16() as usize);
+				let data_size = bits.read_u16() as usize;
 
 				Extra::Bytes(bits.read_u8_array(data_size))
 			} else {
