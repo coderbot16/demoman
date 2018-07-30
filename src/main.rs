@@ -7,7 +7,7 @@ use dem::demo::header::{self, DemoHeader};
 use dem::demo::bits::{BitReader, Bits};
 use dem::demo::usercmd::{UserCmdDelta, PositionUpdate};
 use dem::demo::data_table::DataTables;
-use dem::packets::{PacketKind, TransferFile, Tick, SetCvars, SignonState, ClassInfo, Decal, VoiceInit, Prefetch, VoiceData, PlaySound, UserMessage, EntityMessage, GameEvent, UpdateStringTable, Entities, TempEntities};
+use dem::packets::{PacketKind, TransferFile, Tick, SetCvars, SignonState, ClassInfo, Decal, VoiceInit, Prefetch, VoiceData, PlaySound, UserMessage, EntityMessage, GameEvent, UpdateStringTable, Entities, TempEntities, FixAngle};
 use dem::packets::game_events::GameEventList;
 use dem::packets::string_table::{StringTables, CreateStringTable};
 use dem::demo::frame::{Frame, FramePayload};
@@ -196,25 +196,7 @@ fn parse_update(data: Vec<u8>, demo: &DemoHeader) {
 				PlaySound::Unreliable { sounds, all } => println!("Unreliable: {} sounds, {} bits", sounds, all.bits_len())
 			},
 			PacketKind::SetEntityView    => println!("Entity: {}", bits.read_bits(11)),
-			PacketKind::FixAngle         => {
-				// TODO: BROKEN
-
-				let relative = bits.read_bit();
-
-				let angles = (
-					bits.read_u16(),
-					bits.read_u16(),
-					bits.read_u16()
-				);
-
-				let degrees = (
-					(angles.0 as f32) * 360.0 / 65536.0,
-					(angles.1 as f32) * 360.0 / 65536.0,
-					(angles.2 as f32) * 360.0 / 65536.0
-				);
-
-				println!("Relative: {}, (degrees): {:?} [raw: {:?}]", relative, degrees, angles);
-			},
+			PacketKind::FixAngle         => println!("{:?}", FixAngle::parse(&mut bits)),
 			PacketKind::CrosshairAngle   => {
 				// TODO: BROKEN
 

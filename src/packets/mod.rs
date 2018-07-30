@@ -102,7 +102,7 @@ pub enum Packet {
 	HltvControl,         // UNUSED
 	PlaySound            (PlaySound),
 	SetEntityView        (EntityId),
-	FixAngle,            // TODO
+	FixAngle             (FixAngle),
 	CrosshairAngle,      // TODO
 	Decal                (Decal),
 	TerrainModification, // UNUSED
@@ -139,7 +139,7 @@ impl Packet {
 			PacketKind::HltvControl       => unimplemented!(),
 			PacketKind::PlaySound         => Packet::PlaySound        (PlaySound::parse(bits)),
 			PacketKind::SetEntityView     => Packet::SetEntityView    (bits.read_bits(11) as u16),
-			PacketKind::FixAngle          => unimplemented!(),
+			PacketKind::FixAngle          => Packet::FixAngle         (FixAngle::parse(bits)),
 			PacketKind::CrosshairAngle    => unimplemented!(),
 			PacketKind::Decal             => Packet::Decal            (Decal::parse(bits)),
 			PacketKind::TerrainMod        => unimplemented!(),
@@ -413,6 +413,25 @@ impl PlaySound {
 			let bit_len = bits.read_u16();
 
 			PlaySound::Unreliable { sounds, all: Bits::copy_into(bits, bit_len as usize) }
+		}
+	}
+}
+
+#[derive(Debug, Clone)]
+pub struct FixAngle {
+	relative: bool,
+	angles: (u16, u16, u16)
+}
+
+impl FixAngle {
+	pub fn parse<R>(bits: &mut BitReader<R>) -> Self where R: Read {
+		FixAngle {
+			relative: bits.read_bit(),
+			angles: (
+				bits.read_u16(),
+				bits.read_u16(),
+				bits.read_u16()
+			)
 		}
 	}
 }
