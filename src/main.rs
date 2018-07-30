@@ -21,7 +21,8 @@ use byteorder::{ReadBytesExt, LittleEndian};
 //const PATH: &str = "/home/coderbot/Source/HowToMedicFortress_coderbot_1200_USA.dem";
 //const PATH: &str = "/home/coderbot/.steam/steam/steamapps/common/Team Fortress 2/tf/demos/2017-12-23_16-43-13.dem";
 //const PATH: &str = "/home/coderbot/.steam/steam/steamapps/common/Team Fortress 2/tf/demos/2018-07-28_22-43-39.dem";
-const PATH: &str = "/home/coderbot/.steam/steam/steamapps/common/Team Fortress 2/tf/demos/2016-12-07_18-25-34.dem";
+//const PATH: &str = "/home/coderbot/.steam/steam/steamapps/common/Team Fortress 2/tf/demos/2016-12-07_18-25-34.dem";
+const PATH: &str = "/home/coderbot/Programming/Rust IntelliJ/demoman/test_data/2013-04-10-Granary.dem";
 const USE_OLD_VOICEINIT: bool = true;
 
 fn main() {
