@@ -4,6 +4,27 @@ use packets::string_table::StringTable;
 
 extern crate snap;
 
+#[repr(u32)]
+#[derive(Copy, Clone, Eq, PartialEq, Debug)]
+enum CompressionType {
+	/// Google Snappy compression
+	Snappy = 0x534E4150,
+	/// LZSS (variant of LZ77) based compression
+	Lzss   = 0x4C5A5353
+}
+
+impl CompressionType {
+	fn from_id(id: u32) -> Result<Self, u32> {
+		if id == CompressionType::Snappy as u32 {
+			Ok(CompressionType::Snappy)
+		} else if id == CompressionType::Lzss as u32 {
+			Ok(CompressionType::Lzss)
+		} else {
+			Err(id)
+		}
+	}
+}
+
 pub struct CreateStringTable {
 	pub name:  String,
 	pub table: StringTable
@@ -38,12 +59,11 @@ impl CreateStringTable {
 			assert!(compressed_size > 4);
 
 			let compressed_size = compressed_size - 4;
-			let magic = bits.read_u32().swap_bytes();
 
-			// 'SNAP' in big-endian
-			const SNAP: u32 = 0x534E4150;
-
-			assert_eq!(magic, SNAP, "Unexpected String Table compression magic: expected 0x534E4150 ('SNAP')");
+			let compression = match CompressionType::from_id(bits.read_u32().swap_bytes()) {
+				Ok(compression) => compression,
+				Err(id) => panic!("Unexpected String Table compression magic: expected 0x534E4150 ('SNAP') or 0x4C5A5353 ('LZSS'), got 0x{:08X}", id)
+			};
 
 			//println!("  Using snappy | uncompressed bytes: {}, compressed bytes: {}", uncompressed_size, compressed_size);
 
@@ -52,8 +72,28 @@ impl CreateStringTable {
 				compressed.push(bits.read_u8());
 			}
 
-			let mut snappy = snap::Decoder::new();
-			let uncompressed = snappy.decompress_vec(&compressed).expect("invalid snappy data");
+			let uncompressed = match compression {
+				CompressionType::Snappy => {
+					let mut snappy = snap::Decoder::new();
+					snappy.decompress_vec(&compressed).expect("invalid snappy data")
+				},
+				CompressionType::Lzss => {
+					println!("ERROR!");
+					println!("LZSS: Uncompressed bytes: {}, Compressed bytes: {}", uncompressed_size, compressed_size);
+					println!("Compression type {:?} is unsupported! Returning empty table!", compression);
+
+					println!("LZSS Format Dump:");
+					for byte in compressed {
+						print!("{:02X} ", byte);
+					}
+					println!();
+
+					return CreateStringTable {
+						name,
+						table
+					};
+				}
+			};
 
 			let mut cursor = Cursor::new(&uncompressed);
 			let mut bits = BitReader::new(&mut cursor, uncompressed_size as usize);
