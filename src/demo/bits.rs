@@ -161,7 +161,7 @@ impl<R> BitReader<R> where R: Read {
 	}
 
 	pub fn read_i32(&mut self) -> i32 {
-		self.read_u16() as i32
+		self.read_u32() as i32
 	}
 
 	pub fn read_var(&mut self) -> u32 {
@@ -286,5 +286,9 @@ impl Bits {
 
 	pub fn bits_len(&self) -> usize {
 		self.data.len() * 8 + (self.trailing_bits as usize)
+	}
+
+	pub fn raw_bytes(&self) -> &[u8] {
+		&self.data
 	}
 }

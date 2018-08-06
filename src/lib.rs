@@ -1,5 +1,6 @@
 pub mod demo;
 pub mod packets;
+pub mod game_events;
 
 #[macro_use]
 extern crate nom;

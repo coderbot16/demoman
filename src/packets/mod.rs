@@ -5,11 +5,11 @@ use demo::bits::{BitReader, Bits};
 use std::io::Read;
 
 /// Version 23 and below use a fixed size bit length field instead of a variable size one in CreateStringTable and TempEntities.
-pub const USE_VAR_U32: bool = false;
+pub const USE_VAR_U32: bool = true;
 
 /// Protocol version 22 and below lack a type identifier on the Prefetch packet.
 /// However, all modern versions have this type identifier.
-pub const PREFETCH_HAS_TYPE_IDENTIFIER: bool = false;
+pub const PREFETCH_HAS_TYPE_IDENTIFIER: bool = true;
 
 /// This was changed within version 24, which potentially breaks backwards compatibility.
 const VOICEINIT_HAS_EXTRA_FIELD: bool = false;
