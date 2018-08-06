@@ -4,11 +4,15 @@ pub mod string_table;
 use demo::bits::{BitReader, Bits};
 use std::io::Read;
 
-/// Version 23 and below use a fixed size bit length field instead of a variable size one.
-pub const CREATESTRINGTABLE_LENGTH_FIELD_SIZE_IS_VARIABLE: bool = false;
+/// Version 23 and below use a fixed size bit length field instead of a variable size one in CreateStringTable and TempEntities.
+pub const USE_VAR_U32: bool = false;
+
 /// Protocol version 22 and below lack a type identifier on the Prefetch packet.
 /// However, all modern versions have this type identifier.
 pub const PREFETCH_HAS_TYPE_IDENTIFIER: bool = false;
+
+/// This was changed within version 24, which potentially breaks backwards compatibility.
+const VOICEINIT_HAS_EXTRA_FIELD: bool = false;
 
 type EntityId = u16;
 
@@ -105,22 +109,22 @@ pub enum Packet {
 	UpdateStringTable    (UpdateStringTable),
 	VoiceInit            (VoiceInit),
 	VoiceData            (VoiceData),
-	HltvControl,         // UNUSED
+	HltvControl,         // TODO: Not implemented in current protocol version
 	PlaySound            (PlaySound),
 	SetEntityView        (EntityId),
 	FixAngle             (FixAngle),
-	CrosshairAngle,      // TODO
+	CrosshairAngle,      // TODO: (u16, u16, u16)
 	Decal                (Decal),
-	TerrainModification, // UNUSED
+	TerrainMod,          // TODO: Not implemented in current protocol version
 	UserMessage          (UserMessage),
 	EntityMessage        (EntityMessage),
 	GameEvent            (GameEvent),
-	Entities,            // TODO
-	TempEntities,        // TODO
+	Entities             (Entities),
+	TempEntities         (TempEntities),
 	Prefetch             (Prefetch),
-	PluginMenu,          // TODO
+	PluginMenu,          // TODO: { kind: u16, bytes_len: u16, data: [u8; bytes_len] }
 	GameEventList        (game_events::GameEventList),
-	GetCvar              // TODO
+	GetCvar              // TODO: { cookie: u32, key: String }
 }
 
 impl Packet {
@@ -152,8 +156,8 @@ impl Packet {
 			PacketKind::UserMessage       => Packet::UserMessage      (UserMessage::parse(bits)),
 			PacketKind::EntityMessage     => Packet::EntityMessage    (EntityMessage::parse(bits)),
 			PacketKind::GameEvent         => Packet::GameEvent        (GameEvent::parse(bits)),
-			PacketKind::Entities          => unimplemented!(),
-			PacketKind::TempEntities      => unimplemented!(),
+			PacketKind::Entities          => Packet::Entities         (Entities::parse(bits)),
+			PacketKind::TempEntities      => Packet::TempEntities     (TempEntities::parse(bits)),
 			PacketKind::Prefetch          => Packet::Prefetch         (Prefetch::parse(bits)),
 			PacketKind::PluginMenu        => unimplemented!(),
 			PacketKind::GameEventList     => Packet::GameEventList    (game_events::GameEventList::parse(bits)),
@@ -361,7 +365,7 @@ impl CreateStringTable {
 
 		let index_bits = (16 - max_entries.leading_zeros()) as u8 - 1;
 		let entries = bits.read_bits(index_bits + 1) as u16;
-		let bits_len = if CREATESTRINGTABLE_LENGTH_FIELD_SIZE_IS_VARIABLE { bits.read_var_u32() } else { bits.read_bits(20) };
+		let bits_len = if USE_VAR_U32 { bits.read_var_u32() } else { bits.read_bits(20) };
 
 		// Size and Bits Size
 		let fixed_userdata_size = if bits.read_bit()  {
@@ -402,7 +406,7 @@ impl UpdateStringTable {
 pub struct VoiceInit {
 	pub codec: String,
 	pub quality: u8,
-	pub unknown: u16
+	pub unknown: Option<u16>
 }
 
 impl VoiceInit {
@@ -410,7 +414,7 @@ impl VoiceInit {
 		VoiceInit {
 			codec:   bits.read_string().unwrap(),
 			quality: bits.read_u8(),
-			unknown: bits.read_u16()
+			unknown: if VOICEINIT_HAS_EXTRA_FIELD { Some(bits.read_u16()) } else { None }
 		}
 	}
 }
@@ -590,11 +594,20 @@ impl Entities {
 	}
 }
 
-pub struct TempEntities;
+pub struct TempEntities {
+	pub count: u8,
+	pub data:  Bits
+}
 
 impl TempEntities {
 	pub fn parse<R>(bits: &mut BitReader<R>) -> Self where R: Read {
-		TempEntities
+		let count = bits.read_u8();
+		let bits_len = if USE_VAR_U32 { bits.read_var_u32() } else {bits.read_bits(17) };
+
+		TempEntities {
+			count,
+			data: Bits::copy_into(bits, bits_len as usize)
+		}
 	}
 }
 

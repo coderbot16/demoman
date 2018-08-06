@@ -7,7 +7,7 @@ use dem::demo::header::{self, DemoHeader};
 use dem::demo::bits::{BitReader, Bits};
 use dem::demo::usercmd::{UserCmdDelta, PositionUpdate};
 use dem::demo::data_table::DataTables;
-use dem::packets::{PacketKind, TransferFile, Tick, SetCvars, SignonState, ClassInfo, Decal, VoiceInit, Prefetch, VoiceData, PlaySound, UserMessage, EntityMessage, GameEvent, CreateStringTable, UpdateStringTable, Entities, TempEntities, FixAngle};
+use dem::packets::{PacketKind, Packet, PlaySound, SetCvars, GameEvent};
 use dem::packets::game_events::GameEventList;
 use dem::packets::string_table::{StringTables, NewStringTable};
 use dem::demo::frame::{Frame, FramePayload};
@@ -25,11 +25,6 @@ use byteorder::{ReadBytesExt, LittleEndian};
 //const PATH: &str = "/home/coderbot/Programming/Rust IntelliJ/demoman/test_data/2013-04-10-Granary.dem";
 //const PATH: &str = "/home/coderbot/Programming/Rust IntelliJ/demoman/test_data/2013-02-19-ctf_haunt_b2.dem";
 const PATH: &str = "/home/coderbot/Programming/Rust IntelliJ/demoman/test_data/2012-06-29-Dustbowl.dem";
-
-/// This was changed within version 24, which potentially breaks backwards compatibility.
-const USE_OLD_VOICEINIT: bool = true;
-/// Version 23 and below use a fixed size bit length field instead of a variable size one.
-const TEMPENTITIES_LENGTH_FIELD_SIZE_IS_VARIABLE: bool = false;
 
 fn main() {
 	let mut file = BufReader::new(File::open(PATH).unwrap());
@@ -129,20 +124,20 @@ fn parse_update(data: Vec<u8>, demo: &DemoHeader) {
 
 		print!("  {:>17} | ", format!("{:?}", kind));
 
-		match kind {
-			PacketKind::Nop               => {
+		match Packet::parse_with_kind(&mut bits, kind) {
+			Packet::Nop                       => {
 				if bits.remaining_bits() >= 6 {
 					println!("[Warning: Nop packet found in the middle of an update, this usually means that a packet was improperly parsed]");
 				} else {
 					println!("Nop");
 				}
 			},
-			PacketKind::Disconnect        => unimplemented!(),
-			PacketKind::TransferFile      => println!("{:?}", TransferFile::parse(&mut bits)),
-			PacketKind::Tick              => println!("{:?}", Tick::parse(&mut bits)),
-			PacketKind::StringCommand     => println!("{:?}", bits.read_string()),
-			PacketKind::SetCvars          => {
-				let SetCvars(cvars) = SetCvars::parse(&mut bits);
+			Packet::Disconnect                => unimplemented!(),
+			Packet::TransferFile(packet)      => println!("{:?}", packet),
+			Packet::Tick(packet)              => println!("{:?}", packet),
+			Packet::StringCommand(packet)     => println!("{:?}", packet),
+			Packet::SetCvars(packet)          => {
+				let SetCvars(cvars) = packet;
 
 				println!("{} cvars", cvars.len());
 
@@ -150,64 +145,24 @@ fn parse_update(data: Vec<u8>, demo: &DemoHeader) {
 					println!("  {:>17} : {:?} = {:?}", "", cvar, value);
 				}
 			},
-			PacketKind::SignonState       => println!("{:?}", SignonState::parse(&mut bits)),
-			PacketKind::Print             => println!("Print({:?})", bits.read_string()),
-			PacketKind::ServerInfo        => println!("{:?}", packets::ServerInfo::parse(&mut bits)),
-			PacketKind::DataTable         => unimplemented!(),
-			PacketKind::ClassInfo         => println!("{:?}", ClassInfo::parse(&mut bits)),
-			PacketKind::Pause             => unimplemented!(),
-			PacketKind::CreateStringTable => {
-				let packet = CreateStringTable::parse(&mut bits);
-
-				println!("Table: {}, Entries: {} / {:?}, Fixed Userdata Size: {:?}, Bits: {}", packet.name, packet.entries, packet.max_entries, packet.fixed_userdata_size, packet.data.bits_len());
-
-				/*let NewStringTable { name, table } = NewStringTable::from_packet(packet);
-
-				println!("Table: {}, Entries: {} / {:?}, Fixed Userdata Size: {:?}", name, table.strings.len(), table.capacity(), table.fixed_extra_size());*/
-			},
-			PacketKind::UpdateStringTable => {
-				let update = UpdateStringTable::parse(&mut bits);
-
-				println!("Table: {}, Entries: {}, Bits: {}", update.table_id, update.entries, update.data.bits_len());
-			},
-			PacketKind::VoiceInit         => {
-				if USE_OLD_VOICEINIT {
-					/// VoiceInit message that is missing an extra 16-bit field.
-					#[derive(Debug, Clone)]
-					pub struct VoiceInitOld {
-						pub codec: String,
-						pub quality: u8
-					}
-
-					impl VoiceInitOld {
-						pub fn parse<R>(bits: &mut BitReader<R>) -> Self where R: Read {
-							VoiceInitOld {
-								codec:   bits.read_string().unwrap(),
-								quality: bits.read_u8()
-							}
-						}
-					}
-
-					println!("{:?}", VoiceInitOld::parse(&mut bits));
-				} else {
-					println!("{:?}", VoiceInit::parse(&mut bits));
-				}
-
-				// TODO: Changed recently: Medics demo has different format...
-			},
-			PacketKind::VoiceData         => {
-				let voice_data = VoiceData::parse(&mut bits);
-
-				println!("Sender: {}, Proximity: {}, Bits: {}", voice_data.sender, voice_data.proximity, voice_data.data.bits_len());
-			},
-			PacketKind::HltvControl      => unimplemented!(),
-			PacketKind::PlaySound        => match PlaySound::parse(&mut bits) {
+			Packet::SignonState(packet)       => println!("{:?}", packet),
+			Packet::Print(packet)             => println!("{:?}", packet),
+			Packet::ServerInfo(packet)        => println!("{:?}", packet),
+			Packet::DataTable                 => unimplemented!(),
+			Packet::ClassInfo(packet)         => println!("{:?}", packet),
+			Packet::Pause                     => unimplemented!(),
+			Packet::CreateStringTable(packet) => println!("Table: {}, Entries: {} / {:?}, Fixed Userdata Size: {:?}, Bits: {}", packet.name, packet.entries, packet.max_entries, packet.fixed_userdata_size, packet.data.bits_len()),
+			Packet::UpdateStringTable(packet) => println!("Table: {}, Entries: {}, Bits: {}", packet.table_id, packet.entries, packet.data.bits_len()),
+			Packet::VoiceInit(packet)         => println!("{:?}", packet),
+			Packet::VoiceData(packet)         => println!("Sender: {}, Proximity: {}, Bits: {}", packet.sender, packet.proximity, packet.data.bits_len()),
+			Packet::HltvControl               => unimplemented!(),
+			Packet::PlaySound(packet)         => match packet {
 				PlaySound::Reliable(data)             => println!("Reliable: {} bits", data.bits_len()),
 				PlaySound::Unreliable { sounds, all } => println!("Unreliable: {} sounds, {} bits", sounds, all.bits_len())
 			},
-			PacketKind::SetEntityView    => println!("Entity: {}", bits.read_bits(11)),
-			PacketKind::FixAngle         => println!("{:?}", FixAngle::parse(&mut bits)),
-			PacketKind::CrosshairAngle   => {
+			Packet::SetEntityView(packet)    => println!("{}", packet),
+			Packet::FixAngle(packet)         => println!("{:?}", packet),
+			Packet::CrosshairAngle           => {
 				// TODO: BROKEN
 
 				let angles = (
@@ -224,20 +179,12 @@ fn parse_update(data: Vec<u8>, demo: &DemoHeader) {
 
 				println!("Angles (degrees): {:?} [raw: {:?}]", degrees, angles);
 			},
-			PacketKind::Decal            => println!("{:?}", Decal::parse(&mut bits)),
-			PacketKind::TerrainMod       => unimplemented!(),
-			PacketKind::UserMessage      => {
-				let user_message = UserMessage::parse(&mut bits);
-
-				println!("Channel: {}, Bits: {}", user_message.channel, user_message.data.bits_len());
-			},
-			PacketKind::EntityMessage    => {
-				let entity_message = EntityMessage::parse(&mut bits);
-
-				println!("Entity: {}, Class: {}, Bits: {}", entity_message.entity, entity_message.class, entity_message.data.bits_len());
-			},
-			PacketKind::GameEvent        => {
-				let GameEvent(payload) = GameEvent::parse(&mut bits);
+			Packet::Decal(packet)            => println!("{:?}", packet),
+			Packet::TerrainMod               => unimplemented!(),
+			Packet::UserMessage(packet)      => println!("Channel: {}, Bits: {}", packet.channel, packet.data.bits_len()),
+			Packet::EntityMessage(packet)    => println!("Entity: {}, Class: {}, Bits: {}", packet.entity, packet.class, packet.data.bits_len()),
+			Packet::GameEvent(packet)        => {
+				let GameEvent(payload) = packet;
 
 				if payload.bits_len() < 9 {
 					println!("Error: Too small! Bits: {}", payload.bits_len());
@@ -248,12 +195,12 @@ fn parse_update(data: Vec<u8>, demo: &DemoHeader) {
 
 				println!("Event ID: {}, Bits: {}", id, payload.bits_len());
 			},
-			PacketKind::Entities         => {
-				let entities = Entities::parse(&mut bits);
+			Packet::Entities(packet)         => {
+				println!("Entries: {} updated / {} max, Baseline: {} Update Baseline: {}, Delta From Tick: {:?}, Bits: {}", packet.updated, packet.max_entries, packet.baseline, packet.update_baseline, packet.delta_from_tick, packet.data.bits_len());
 
-				println!("Entries: {} updated / {} max, Baseline: {} Update Baseline: {}, Delta From Tick: {:?}, Bits: {}", entities.updated, entities.max_entries, entities.baseline, entities.update_baseline, entities.delta_from_tick, entities.data.bits_len());
+				let mut bits = packet.data.reader();
 
-				/*#[derive(Debug, Eq, PartialEq)]
+				#[derive(Debug, Eq, PartialEq, Copy, Clone)]
 				enum UpdateType {
 					EnterPvs,
 					LeavePvs,
@@ -263,7 +210,9 @@ fn parse_update(data: Vec<u8>, demo: &DemoHeader) {
 					Preserve
 				}
 
-				let mut remaining_headers = updated;
+				let mut remaining_headers = packet.updated;
+
+				'outer:
 				loop {
 					remaining_headers -= 1;
 					let is_entity = remaining_headers >= 0;
@@ -292,28 +241,17 @@ fn parse_update(data: Vec<u8>, demo: &DemoHeader) {
 							UpdateType::Finished => unreachable!()
 						}
 
+						println!("  {:>17} : Update Type: {:?}", "", update_type);
+
 						if update_type != UpdateType::Preserve {
-							break;
+							break 'outer;
 						}
 					}
 				}
-
-				println!("    Update Type: {:?}", update_type);*/
-
-				//break;
 			},
-			PacketKind::TempEntities     => {
-				let count = bits.read_u8();
-				let bits_len = if TEMPENTITIES_LENGTH_FIELD_SIZE_IS_VARIABLE { bits.read_var_u32() } else {bits.read_bits(17) };
-
-				println!("Count: {}, Bits: {}", count, bits_len);
-
-				for _ in 0..bits_len {
-					bits.read_bit();
-				}
-			},
-			PacketKind::Prefetch         => println!("{:?}", Prefetch::parse(&mut bits)),
-			PacketKind::PluginMenu       => {
+			Packet::TempEntities(packet)     => println!("Count: {}, Bits: {}", packet.count, packet.data.bits_len()),
+			Packet::Prefetch(packet)         => println!("{:?}", packet),
+			Packet::PluginMenu               => {
 				// TODO: BROKEN
 
 				let kind = bits.read_u16();
@@ -328,12 +266,8 @@ fn parse_update(data: Vec<u8>, demo: &DemoHeader) {
 				println!("  Don't know how to handle a Menu!");
 				break;
 			},
-			PacketKind::GameEventList    => {
-				let event_list = GameEventList::parse(&mut bits).0;
-
-				println!("{} events not shown", event_list.len());
-			},
-			PacketKind::GetCvar          => {
+			Packet::GameEventList(packet)    => println!("{} events not shown", packet.0.len()),
+			Packet::GetCvar                  => {
 				// TODO: BROKEN?
 
 				println!("Cookie: {}, CVar: {:?}", bits.read_u32(), bits.read_string());
