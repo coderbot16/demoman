@@ -163,7 +163,7 @@ impl Handler for ShowGameEvents {
 
 				//println!("  Index: {}", id, game_event.name);
 
-				use dem::game_events::Value;
+				use dem::payload::game_events::Value;
 
 				let mut values = ::std::collections::HashMap::new();
 
@@ -223,7 +223,7 @@ impl Handler for ShowGameEvents {
 				println!("  }}");
 				println!("}},");
 
-				/*let values = ::dem::game_events::GameEventData(values);
+				/*let values = ::dem::payload::game_events::GameEventData(values);
 
 				match game_event.name.as_ref() {
 					/*"player_hurt" => {
