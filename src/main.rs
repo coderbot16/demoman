@@ -9,7 +9,7 @@ use dem::demo::usercmd::{UserCmdDelta, PositionUpdate};
 use dem::demo::data_table::DataTables;
 use dem::packets::{PacketKind, Packet, PlaySound, SetCvars, GameEvent};
 use dem::packets::game_events::{GameEventList, GameEventInfo, Kind};
-use dem::packets::string_table::{StringTables, NewStringTable};
+use dem::packets::string_table::{StringTables, NewStringTable, Extra};
 use dem::demo::frame::{Frame, FramePayload};
 use dem::packets::string_table::StringTable;
 use dem::packets;
@@ -18,15 +18,15 @@ use std::io::{BufReader, Read, Seek, SeekFrom};
 use std::fs::File;
 use byteorder::{ReadBytesExt, LittleEndian};
 
-const PATH: &str = "/home/coderbot/Source/HowToMedicFortress_coderbot_1200_USA.dem";
+//const PATH: &str = "/home/coderbot/Source/HowToMedicFortress_coderbot_1200_USA.dem";
 //const PATH: &str = "/home/coderbot/.steam/steam/steamapps/common/Team Fortress 2/tf/demos/2017-12-23_16-43-13.dem";
 //const PATH: &str = "/home/coderbot/.steam/steam/steamapps/common/Team Fortress 2/tf/demos/2018-07-28_22-43-39.dem";
 //const PATH: &str = "/home/coderbot/.steam/steam/steamapps/common/Team Fortress 2/tf/demos/2016-12-07_18-25-34.dem";
 //const PATH: &str = "/home/coderbot/Programming/Rust IntelliJ/demoman/test_data/2013-04-10-Granary.dem";
 //const PATH: &str = "/home/coderbot/Programming/Rust IntelliJ/demoman/test_data/2013-02-19-ctf_haunt_b2.dem";
-//const PATH: &str = "/home/coderbot/Programming/Rust IntelliJ/demoman/test_data/2012-06-29-Dustbowl.dem";
+const PATH: &str = "/home/coderbot/Programming/Rust IntelliJ/demoman/test_data/2012-06-29-Dustbowl.dem";
 
-const MAX_PARSED_PACKETS: usize = /*4096*/4_000_000_000;
+const MAX_PARSED_PACKETS: usize = 4096/*4_000_000_000*/;
 
 trait Handler {
 	fn packet(&mut self, packet: Packet);
@@ -52,7 +52,7 @@ fn main() {
 	println!("-- START OF SIGNON DATA ({} bytes) --", demo.signon_length);
 	println!();
 
-	let mut handler = ShowGameEvents { list: None };
+	let mut handler = /*ShowGameEvents { list: None }*/PrintAll;
 
 	// Iterate over a limited amount of packets
 	for _ in 0..MAX_PARSED_PACKETS {
@@ -65,16 +65,16 @@ fn main() {
 		}
 
 		let frame = Frame::parse(&mut file);
-		//print!("T: {} ", frame.tick);
+		print!("T: {} ", frame.tick);
 
 		match frame.payload {
 			FramePayload::SignonUpdate(update) | FramePayload::Update(update) => {
-				//println!("| Update ({} packet bytes)", update.packets.len());
+				println!("| Update ({} packet bytes)", update.packets.len());
 
 				parse_update(update.packets, &demo, &mut handler);
 			},
 			FramePayload::TickSync => println!("| Tick Sync"),
-			FramePayload::ConsoleCommand(command) => /*println!("> {}", command)*/(),
+			FramePayload::ConsoleCommand(command) => println!("> {}", command),
 			FramePayload::UserCmdDelta(delta) => /*println!("| UserCmdDelta (hidden)")*/(),
 			FramePayload::DataTables(tables) => println!("| Data Tables - {} tables, {} class links", tables.tables.len(), tables.links.len()),
 			FramePayload::Stop => {
@@ -91,13 +91,22 @@ fn main() {
 						&None => println!("no client strings")
 					}
 
-					/*for (index, &(ref string, ref extra)) in table.1.primary.iter().enumerate() {
+					for (index, &(ref string, ref extra)) in pair.primary.strings.iter().enumerate() {
 						print!("    #{}: {} ", index, string);
 						match extra {
-							&Some(ref bytes) => println!("= {:?}", bytes),
-							&None => println!()
+							&Extra::Bits { count, data } => println!("= (bit count: {}, bit data: {})", count, data),
+							&Extra::Bytes(ref bytes) => {
+								print!("= ");
+
+								for &byte in bytes {
+									print!("{:02X} ", byte);
+								}
+
+								println!()
+							},
+							&Extra::None => println!()
 						}
-					}*/
+					}
 				}
 			}
 		}
@@ -271,42 +280,13 @@ impl Handler for ShowGameEvents {
 	}
 }
 
-fn parse_update<H>(data: Vec<u8>, demo: &DemoHeader, handler: &mut H) where H: Handler {
-	let data = Bits::from_bytes(data);
-	let mut bits = data.reader();
+struct PrintAll;
+impl Handler for PrintAll {
+	fn packet(&mut self, packet: Packet) {
+		print!("  {:>17} | ", format!("{:?}", packet.kind()));
 
-	assert!(demo.network_protocol > 10, "Network protocols less than 10 do not have fixed_time and fixed_time_stdev in Tick, this is not handled yet!");
-
-	while bits.remaining_bits() >= 6 {
-		let id = bits.read_bits(6);
-
-		let kind = PacketKind::from_id(id as u8).expect("Packet ID cannot be greater than 31");
-
-		handler.packet(Packet::parse_with_kind(&mut bits, kind));
-	}
-}
-
-fn parse_update_full(data: Vec<u8>, demo: &DemoHeader) {
-	let data = Bits::from_bytes(data);
-	let mut bits = data.reader();
-
-	assert!(demo.network_protocol > 10, "Network protocols less than 10 do not have fixed_time and fixed_time_stdev in Tick, this is not handled yet!");
-
-	while bits.remaining_bits() >= 6 {
-		let id = bits.read_bits(6);
-
-		let kind = PacketKind::from_id(id as u8).expect("Packet ID cannot be greater than 31");
-
-		print!("  {:>17} | ", format!("{:?}", kind));
-
-		match Packet::parse_with_kind(&mut bits, kind) {
-			Packet::Nop                       => {
-				if bits.remaining_bits() >= 6 {
-					println!("[Warning: Nop packet found in the middle of an update, this usually means that a packet was improperly parsed]");
-				} else {
-					println!("Nop");
-				}
-			},
+		match packet {
+			Packet::Nop                       => (),
 			Packet::Disconnect                => unimplemented!(),
 			Packet::TransferFile(packet)      => println!("{:?}", packet),
 			Packet::Tick(packet)              => println!("{:?}", packet),
@@ -340,7 +320,7 @@ fn parse_update_full(data: Vec<u8>, demo: &DemoHeader) {
 			Packet::CrosshairAngle           => {
 				// TODO: BROKEN
 
-				let angles = (
+				/*let angles = (
 					bits.read_u16(),
 					bits.read_u16(),
 					bits.read_u16()
@@ -352,7 +332,7 @@ fn parse_update_full(data: Vec<u8>, demo: &DemoHeader) {
 					(angles.2 as f32) * 360.0 / 65536.0
 				);
 
-				println!("Angles (degrees): {:?} [raw: {:?}]", degrees, angles);
+				println!("Angles (degrees): {:?} [raw: {:?}]", degrees, angles);*/
 			},
 			Packet::Decal(packet)            => println!("{:?}", packet),
 			Packet::TerrainMod               => unimplemented!(),
@@ -363,7 +343,7 @@ fn parse_update_full(data: Vec<u8>, demo: &DemoHeader) {
 
 				if payload.bits_len() < 9 {
 					println!("Error: Too small! Bits: {}", payload.bits_len());
-					break;
+					return;
 				}
 
 				let id = payload.reader().read_bits(9);
@@ -388,7 +368,7 @@ fn parse_update_full(data: Vec<u8>, demo: &DemoHeader) {
 				let mut remaining_headers = packet.updated;
 
 				'outer:
-				loop {
+					loop {
 					remaining_headers -= 1;
 					let is_entity = remaining_headers >= 0;
 
@@ -429,32 +409,40 @@ fn parse_update_full(data: Vec<u8>, demo: &DemoHeader) {
 			Packet::PluginMenu               => {
 				// TODO: BROKEN
 
-				let kind = bits.read_u16();
+				/*let kind = bits.read_u16();
 				let len = bits.read_u16();
 
 				println!("Kind: {}, len: {}", kind, len);
 
 				for _ in 0..len {
 					print!("{} ", bits.read_u8());
-				}
+				}*/
 
 				println!("  Don't know how to handle a Menu!");
-				break;
 			},
 			Packet::GameEventList(packet)    => println!("{} events not shown", packet.0.len()),
 			Packet::GetCvar                  => {
 				// TODO: BROKEN?
 
-				println!("Cookie: {}, CVar: {:?}", bits.read_u32(), bits.read_string());
+				//println!("Cookie: {}, CVar: {:?}", bits.read_u32(), bits.read_string());
 
 				println!("  Don't know how to handle a GetCvarValue!");
-				break;
 			}
 		}
 	}
+}
 
-	if bits.remaining_bits() >= 6 {
-		println!(" === SOME PACKETS NOT PARSED ==");
-		::std::process::exit(0);
+fn parse_update<H>(data: Vec<u8>, demo: &DemoHeader, handler: &mut H) where H: Handler {
+	let data = Bits::from_bytes(data);
+	let mut bits = data.reader();
+
+	assert!(demo.network_protocol > 10, "Network protocols less than 10 do not have fixed_time and fixed_time_stdev in Tick, this is not handled yet!");
+
+	while bits.remaining_bits() >= 6 {
+		let id = bits.read_bits(6);
+
+		let kind = PacketKind::from_id(id as u8).expect("Packet ID cannot be greater than 31");
+
+		handler.packet(Packet::parse_with_kind(&mut bits, kind));
 	}
 }

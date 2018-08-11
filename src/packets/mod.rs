@@ -5,11 +5,11 @@ use demo::bits::{BitReader, Bits};
 use std::io::Read;
 
 /// Version 23 and below use a fixed size bit length field instead of a variable size one in CreateStringTable and TempEntities.
-pub const USE_VAR_U32: bool = true;
+pub const USE_VAR_U32: bool = false;
 
 /// Protocol version 22 and below lack a type identifier on the Prefetch packet.
 /// However, all modern versions have this type identifier.
-pub const PREFETCH_HAS_TYPE_IDENTIFIER: bool = true;
+pub const PREFETCH_HAS_TYPE_IDENTIFIER: bool = false;
 
 /// This was changed within version 24, which potentially breaks backwards compatibility.
 const VOICEINIT_HAS_EXTRA_FIELD: bool = false;
@@ -128,6 +128,43 @@ pub enum Packet {
 }
 
 impl Packet {
+	pub fn kind(&self) -> PacketKind {
+		match *self {
+			Packet::Nop => PacketKind::Nop,
+			Packet::Disconnect => PacketKind::Disconnect,
+			Packet::TransferFile(_) => PacketKind::TransferFile,
+			Packet::Tick(_) => PacketKind::Tick,
+			Packet::StringCommand(_) => PacketKind::StringCommand,
+			Packet::SetCvars(_) => PacketKind::SetCvars,
+			Packet::SignonState(_) => PacketKind::SignonState,
+			Packet::Print(_) => PacketKind::Print,
+			Packet::ServerInfo(_) => PacketKind::ServerInfo,
+			Packet::DataTable => PacketKind::DataTable,
+			Packet::ClassInfo(_) => PacketKind::ClassInfo,
+			Packet::Pause => PacketKind::Pause,
+			Packet::CreateStringTable(_) => PacketKind::CreateStringTable,
+			Packet::UpdateStringTable(_) => PacketKind::UpdateStringTable,
+			Packet::VoiceInit(_) => PacketKind::VoiceInit,
+			Packet::VoiceData(_) => PacketKind::VoiceData,
+			Packet::HltvControl => PacketKind::HltvControl,
+			Packet::PlaySound(_) => PacketKind::PlaySound,
+			Packet::SetEntityView(_) => PacketKind::SetEntityView,
+			Packet::FixAngle(_) => PacketKind::FixAngle,
+			Packet::CrosshairAngle => PacketKind::CrosshairAngle,
+			Packet::Decal(_) => PacketKind::Decal,
+			Packet::TerrainMod => PacketKind::TerrainMod,
+			Packet::UserMessage(_) => PacketKind::UserMessage,
+			Packet::EntityMessage(_) => PacketKind::EntityMessage,
+			Packet::GameEvent(_) => PacketKind::GameEvent,
+			Packet::Entities(_) => PacketKind::Entities,
+			Packet::TempEntities(_) => PacketKind::TempEntities,
+			Packet::Prefetch(_) => PacketKind::Prefetch,
+			Packet::PluginMenu => PacketKind::PluginMenu,
+			Packet::GameEventList(_) => PacketKind::GameEventList,
+			Packet::GetCvar => PacketKind::GetCvar
+		}
+	}
+
 	pub fn parse_with_kind<R>(bits: &mut BitReader<R>, kind: PacketKind) -> Self where R: Read {
 		match kind {
 			PacketKind::Nop               => Packet::Nop,
