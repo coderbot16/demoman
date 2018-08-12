@@ -21,12 +21,20 @@ use byteorder::{ReadBytesExt, LittleEndian};
 //const PATH: &str = "/home/coderbot/Source/HowToMedicFortress_coderbot_1200_USA.dem";
 //const PATH: &str = "/home/coderbot/.steam/steam/steamapps/common/Team Fortress 2/tf/demos/2017-12-23_16-43-13.dem";
 //const PATH: &str = "/home/coderbot/.steam/steam/steamapps/common/Team Fortress 2/tf/demos/2018-07-28_22-43-39.dem";
+//const PATH: &str = "/home/coderbot/.steam/steam/steamapps/common/Team Fortress 2/tf/demos/2018-08-11_21-53-34.dem";
 //const PATH: &str = "/home/coderbot/.steam/steam/steamapps/common/Team Fortress 2/tf/demos/2016-12-07_18-25-34.dem";
 //const PATH: &str = "/home/coderbot/Programming/Rust IntelliJ/demoman/test_data/2013-04-10-Granary.dem";
 //const PATH: &str = "/home/coderbot/Programming/Rust IntelliJ/demoman/test_data/2013-02-19-ctf_haunt_b2.dem";
-const PATH: &str = "/home/coderbot/Programming/Rust IntelliJ/demoman/test_data/2012-06-29-Dustbowl.dem";
+//const PATH: &str = "/home/coderbot/Programming/Rust IntelliJ/demoman/test_data/2012-07-23-Steel.dem";
+//const PATH: &str = "/home/coderbot/Programming/Rust IntelliJ/demoman/test_data/2012-06-29-Dustbowl.dem";
+const PATH: &str = "/home/coderbot/.steam/steam/steamapps/common/Half-Life 2/hl2/first.dem";
 
-const MAX_PARSED_PACKETS: usize = 4096/*4_000_000_000*/;
+const MAX_PARSED_PACKETS: usize = /*4_000_000_000*/4096;
+const SHOW_STRING_TABLES: bool = false;
+const SHOW_DATA_TABLES: bool = false;
+const SHOW_STRING_TABLE_CONTENTS: bool = false;
+const SHOW_FRAME_HEADER_SPAM: bool = true;
+const SHOW_COMMANDS: bool = false;
 
 trait Handler {
 	fn packet(&mut self, packet: Packet);
@@ -52,7 +60,7 @@ fn main() {
 	println!("-- START OF SIGNON DATA ({} bytes) --", demo.signon_length);
 	println!();
 
-	let mut handler = /*ShowGameEvents { list: None }*/PrintAll;
+	let mut handler = /*ShowGameEvents { list: None }*/PrintAll/*DumpVoiceData*/;
 
 	// Iterate over a limited amount of packets
 	for _ in 0..MAX_PARSED_PACKETS {
@@ -65,23 +73,32 @@ fn main() {
 		}
 
 		let frame = Frame::parse(&mut file);
-		print!("T: {} ", frame.tick);
+
+		if SHOW_FRAME_HEADER_SPAM {
+			print!("T: {} ", frame.tick);
+		}
 
 		match frame.payload {
 			FramePayload::SignonUpdate(update) | FramePayload::Update(update) => {
-				println!("| Update ({} packet bytes)", update.packets.len());
+				if SHOW_FRAME_HEADER_SPAM {
+					println!("| Update ({} packet bytes) [OFFS:{}]", update.packets.len(), file.seek(SeekFrom::Current(0)).unwrap());
+				}
 
 				parse_update(update.packets, &demo, &mut handler);
 			},
 			FramePayload::TickSync => println!("| Tick Sync"),
-			FramePayload::ConsoleCommand(command) => println!("> {}", command),
+			FramePayload::ConsoleCommand(command) => if SHOW_COMMANDS { println!("> {}", command) },
 			FramePayload::UserCmdDelta(delta) => /*println!("| UserCmdDelta (hidden)")*/(),
-			FramePayload::DataTables(tables) => println!("| Data Tables - {} tables, {} class links", tables.tables.len(), tables.links.len()),
+			FramePayload::DataTables(tables) => if SHOW_DATA_TABLES { println!("| Data Tables - {} tables, {} class links", tables.tables.len(), tables.links.len()) },
 			FramePayload::Stop => {
 				println!("| Stop");
 				break;
 			},
 			FramePayload::StringTables(tables) => {
+				if !SHOW_STRING_TABLES {
+					continue;
+				}
+
 				println!("| String Tables - {} tables", tables.0.len());
 
 				for (index, &(ref name, ref pair)) in tables.0.iter().enumerate() {
@@ -89,6 +106,10 @@ fn main() {
 					match &pair.client {
 						&Some(ref table) => println!("{} client strings", table.strings.len()),
 						&None => println!("no client strings")
+					}
+
+					if !SHOW_STRING_TABLE_CONTENTS {
+						continue;
 					}
 
 					for (index, &(ref string, ref extra)) in pair.primary.strings.iter().enumerate() {
@@ -127,6 +148,30 @@ for table in &tables.tables {
 
 	println!();
 }*/
+
+
+struct DumpVoiceData;
+
+impl Handler for DumpVoiceData {
+	fn packet(&mut self, packet: Packet) {
+		match packet {
+			Packet::VoiceInit(packet) => {
+				println!("{:?}", packet)
+			},
+			Packet::VoiceData(packet) => {
+				//print!("[Sender: {}, Proximity: {}, Bytes: {}] ", packet.sender, packet.proximity, packet.data.raw_bytes().len());
+
+				for &byte in packet.data.raw_bytes().iter().take(20) {
+					print!("{:02X} ", byte);
+				}
+
+				println!();
+				//println!();
+			},
+			_ => ()
+		}
+	}
+}
 
 struct ShowGameEvents {
 	list: Option<Vec<GameEventInfo>>
@@ -286,7 +331,7 @@ impl Handler for PrintAll {
 		print!("  {:>17} | ", format!("{:?}", packet.kind()));
 
 		match packet {
-			Packet::Nop                       => (),
+			Packet::Nop                       => println!(),
 			Packet::Disconnect                => unimplemented!(),
 			Packet::TransferFile(packet)      => println!("{:?}", packet),
 			Packet::Tick(packet)              => println!("{:?}", packet),
@@ -317,7 +362,7 @@ impl Handler for PrintAll {
 			},
 			Packet::SetEntityView(packet)    => println!("{}", packet),
 			Packet::FixAngle(packet)         => println!("{:?}", packet),
-			Packet::CrosshairAngle           => {
+			Packet::CrosshairAngle(packet)   => println!("{:?}", packet), /*{
 				// TODO: BROKEN
 
 				/*let angles = (
@@ -333,7 +378,7 @@ impl Handler for PrintAll {
 				);
 
 				println!("Angles (degrees): {:?} [raw: {:?}]", degrees, angles);*/
-			},
+			},*/
 			Packet::Decal(packet)            => println!("{:?}", packet),
 			Packet::TerrainMod               => unimplemented!(),
 			Packet::UserMessage(packet)      => println!("Channel: {}, Bits: {}", packet.channel, packet.data.bits_len()),

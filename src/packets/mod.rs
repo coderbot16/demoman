@@ -4,15 +4,21 @@ pub mod string_table;
 use demo::bits::{BitReader, Bits};
 use std::io::Read;
 
+const USE_PROTOCOL: u32 = 24_0;
+
 /// Version 23 and below use a fixed size bit length field instead of a variable size one in CreateStringTable and TempEntities.
-pub const USE_VAR_U32: bool = false;
+pub const USE_VAR_U32: bool = USE_PROTOCOL >= 24_0;
 
 /// Protocol version 22 and below lack a type identifier on the Prefetch packet.
 /// However, all modern versions have this type identifier.
-pub const PREFETCH_HAS_TYPE_IDENTIFIER: bool = false;
+pub const PREFETCH_HAS_TYPE_IDENTIFIER: bool = USE_PROTOCOL >= 23_0;
 
 /// This was changed within version 24, which potentially breaks backwards compatibility.
-const VOICEINIT_HAS_EXTRA_FIELD: bool = false;
+pub const VOICEINIT_HAS_EXTRA_FIELD: bool = USE_PROTOCOL >= 24_5;
+
+// TODO: 12 in older versions! Appears to be related to the size of the `modelprecache` string table.
+// The version test here is very inaccurate.
+pub const MODEL_INDEX_BITS: u8 = 12 + (USE_PROTOCOL >= 24_0) as u8;
 
 type EntityId = u16;
 
@@ -113,7 +119,7 @@ pub enum Packet {
 	PlaySound            (PlaySound),
 	SetEntityView        (EntityId),
 	FixAngle             (FixAngle),
-	CrosshairAngle,      // TODO: (u16, u16, u16)
+	CrosshairAngle       (CrosshairAngle),
 	Decal                (Decal),
 	TerrainMod,          // TODO: Not implemented in current protocol version
 	UserMessage          (UserMessage),
@@ -150,7 +156,7 @@ impl Packet {
 			Packet::PlaySound(_) => PacketKind::PlaySound,
 			Packet::SetEntityView(_) => PacketKind::SetEntityView,
 			Packet::FixAngle(_) => PacketKind::FixAngle,
-			Packet::CrosshairAngle => PacketKind::CrosshairAngle,
+			Packet::CrosshairAngle(_) => PacketKind::CrosshairAngle,
 			Packet::Decal(_) => PacketKind::Decal,
 			Packet::TerrainMod => PacketKind::TerrainMod,
 			Packet::UserMessage(_) => PacketKind::UserMessage,
@@ -187,7 +193,7 @@ impl Packet {
 			PacketKind::PlaySound         => Packet::PlaySound        (PlaySound::parse(bits)),
 			PacketKind::SetEntityView     => Packet::SetEntityView    (bits.read_bits(11) as u16),
 			PacketKind::FixAngle          => Packet::FixAngle         (FixAngle::parse(bits)),
-			PacketKind::CrosshairAngle    => unimplemented!(),
+			PacketKind::CrosshairAngle    => Packet::CrosshairAngle   (CrosshairAngle::parse(bits)),
 			PacketKind::Decal             => Packet::Decal            (Decal::parse(bits)),
 			PacketKind::TerrainMod        => unimplemented!(),
 			PacketKind::UserMessage       => Packet::UserMessage      (UserMessage::parse(bits)),
@@ -520,6 +526,23 @@ impl FixAngle {
 }
 
 #[derive(Debug, Clone)]
+pub struct CrosshairAngle {
+	angles: (u16, u16, u16)
+}
+
+impl CrosshairAngle {
+	pub fn parse<R>(bits: &mut BitReader<R>) -> Self where R: Read {
+		CrosshairAngle {
+			angles: (
+				bits.read_u16(),
+				bits.read_u16(),
+				bits.read_u16()
+			)
+		}
+	}
+}
+
+#[derive(Debug, Clone)]
 pub struct Decal {
 	pub position: (f32, f32, f32),
 	pub decal_index: u16,
@@ -534,7 +557,7 @@ impl Decal {
 		let decal_index = bits.read_bits(9) as u16;
 
 		let (entity_index, model_index) = if bits.read_bit() {
-			(bits.read_bits(11) as u16, bits.read_bits(11) as u16)
+			(bits.read_bits(11) as u16, bits.read_bits(MODEL_INDEX_BITS) as u16)
 		} else {
 			(0, 0)
 		};

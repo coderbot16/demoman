@@ -16,7 +16,7 @@ impl Default for Sound {
 		Sound {
 			entity: 0,
 			sound_index: 0,
-			flags: 0,
+			flags: Flags(0),
 			channel: Channel::Static,
 			ambient: false,
 			sentence: false
@@ -149,6 +149,7 @@ impl SequenceUpdate {
 	}
 }
 
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum Channel {
 	Auto,
 	Weapon,
@@ -171,9 +172,11 @@ impl Channel {
 			4 => Channel::Body,
 			5 => Channel::Stream,
 			6 => Channel::Static,
-			7 => Channel::Reserved
+			7 => Channel::Reserved,
+			_ => unreachable!()
 		}
 	}
 }
 
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct Flags(pub u16);
