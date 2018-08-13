@@ -27,13 +27,16 @@ use byteorder::{ReadBytesExt, LittleEndian};
 //const PATH: &str = "/home/coderbot/Programming/Rust IntelliJ/demoman/test_data/2013-02-19-ctf_haunt_b2.dem";
 //const PATH: &str = "/home/coderbot/Programming/Rust IntelliJ/demoman/test_data/2012-07-23-Steel.dem";
 //const PATH: &str = "/home/coderbot/Programming/Rust IntelliJ/demoman/test_data/2012-06-29-Dustbowl.dem";
-const PATH: &str = "/home/coderbot/.steam/steam/steamapps/common/Half-Life 2/hl2/first.dem";
+const PATH: &str = "/home/coderbot/Programming/Rust IntelliJ/demoman/test_data/2010-04-07-Badlands.dem";
+//const PATH: &str = "/home/coderbot/Programming/Rust IntelliJ/demoman/test_data/2009-10-22-Granary.dem";
+//const PATH: &str = "/home/coderbot/.steam/steam/steamapps/common/Half-Life 2/hl2/first.dem";
 
-const MAX_PARSED_PACKETS: usize = /*4_000_000_000*/4096;
+//const MAX_PARSED_PACKETS: usize = 4096;
+const MAX_PARSED_PACKETS: usize = 4_000_000_000;
 const SHOW_STRING_TABLES: bool = false;
 const SHOW_DATA_TABLES: bool = false;
 const SHOW_STRING_TABLE_CONTENTS: bool = false;
-const SHOW_FRAME_HEADER_SPAM: bool = true;
+const SHOW_FRAME_HEADER_SPAM: bool = false;
 const SHOW_COMMANDS: bool = false;
 
 trait Handler {
@@ -60,7 +63,9 @@ fn main() {
 	println!("-- START OF SIGNON DATA ({} bytes) --", demo.signon_length);
 	println!();
 
-	let mut handler = /*ShowGameEvents { list: None }*/PrintAll/*DumpVoiceData*/;
+	//let mut handler = ShowGameEvents { list: None };
+	//let mut handler = PrintAll;
+	let mut handler = DumpVoiceData;
 
 	// Iterate over a limited amount of packets
 	for _ in 0..MAX_PARSED_PACKETS {
@@ -161,7 +166,12 @@ impl Handler for DumpVoiceData {
 			Packet::VoiceData(packet) => {
 				//print!("[Sender: {}, Proximity: {}, Bytes: {}] ", packet.sender, packet.proximity, packet.data.raw_bytes().len());
 
-				for &byte in packet.data.raw_bytes().iter().take(20) {
+				if packet.data.bits_len() == 0 {
+					println!("[Voice Data Ack]");
+					return;
+				}
+
+				for &byte in packet.data.raw_bytes().iter()/*.take(20)*/ {
 					print!("{:02X} ", byte);
 				}
 
@@ -350,7 +360,7 @@ impl Handler for PrintAll {
 			Packet::ServerInfo(packet)        => println!("{:?}", packet),
 			Packet::DataTable                 => unimplemented!(),
 			Packet::ClassInfo(packet)         => println!("{:?}", packet),
-			Packet::Pause                     => unimplemented!(),
+			Packet::Pause(paused)             => println!("Is Paused: {}", paused),
 			Packet::CreateStringTable(packet) => println!("Table: {}, Entries: {} / {:?}, Fixed Userdata Size: {:?}, Bits: {}", packet.name, packet.entries, packet.max_entries, packet.fixed_userdata_size, packet.data.bits_len()),
 			Packet::UpdateStringTable(packet) => println!("Table: {}, Entries: {}, Bits: {}", packet.table_id, packet.entries, packet.data.bits_len()),
 			Packet::VoiceInit(packet)         => println!("{:?}", packet),
@@ -451,20 +461,7 @@ impl Handler for PrintAll {
 			},
 			Packet::TempEntities(packet)     => println!("Count: {}, Bits: {}", packet.count, packet.data.bits_len()),
 			Packet::Prefetch(packet)         => println!("{:?}", packet),
-			Packet::PluginMenu               => {
-				// TODO: BROKEN
-
-				/*let kind = bits.read_u16();
-				let len = bits.read_u16();
-
-				println!("Kind: {}, len: {}", kind, len);
-
-				for _ in 0..len {
-					print!("{} ", bits.read_u8());
-				}*/
-
-				println!("  Don't know how to handle a Menu!");
-			},
+			Packet::PluginMenu(packet)       => println!("Kind: {}, Bytes: {}", packet.kind, packet.data.len()),
 			Packet::GameEventList(packet)    => println!("{} events not shown", packet.0.len()),
 			Packet::GetCvar                  => {
 				// TODO: BROKEN?
@@ -483,8 +480,8 @@ fn parse_update<H>(data: Vec<u8>, demo: &DemoHeader, handler: &mut H) where H: H
 
 	assert!(demo.network_protocol > 10, "Network protocols less than 10 do not have fixed_time and fixed_time_stdev in Tick, this is not handled yet!");
 
-	while bits.remaining_bits() >= 6 {
-		let id = bits.read_bits(6);
+	while bits.remaining_bits() >= packets::PACKET_KIND_BITS as usize {
+		let id = bits.read_bits(packets::PACKET_KIND_BITS);
 
 		let kind = PacketKind::from_id(id as u8).expect("Packet ID cannot be greater than 31");
 

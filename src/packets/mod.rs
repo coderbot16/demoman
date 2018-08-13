@@ -4,7 +4,7 @@ pub mod string_table;
 use demo::bits::{BitReader, Bits};
 use std::io::Read;
 
-const USE_PROTOCOL: u32 = 24_0;
+const USE_PROTOCOL: u32 = 15_0;
 
 /// Version 23 and below use a fixed size bit length field instead of a variable size one in CreateStringTable and TempEntities.
 pub const USE_VAR_U32: bool = USE_PROTOCOL >= 24_0;
@@ -14,11 +14,14 @@ pub const USE_VAR_U32: bool = USE_PROTOCOL >= 24_0;
 pub const PREFETCH_HAS_TYPE_IDENTIFIER: bool = USE_PROTOCOL >= 23_0;
 
 /// This was changed within version 24, which potentially breaks backwards compatibility.
-pub const VOICEINIT_HAS_EXTRA_FIELD: bool = USE_PROTOCOL >= 24_5;
+pub const VOICEINIT_HAS_EXTRA_FIELD: bool = USE_PROTOCOL >= 24_1;
 
 // TODO: 12 in older versions! Appears to be related to the size of the `modelprecache` string table.
 // The version test here is very inaccurate.
 pub const MODEL_INDEX_BITS: u8 = 12 + (USE_PROTOCOL >= 24_0) as u8;
+
+// TODO: 16_0 is just a guess, I really don't know
+pub const PACKET_KIND_BITS: u8 = 5 + (USE_PROTOCOL >= 16_0) as u8;
 
 type EntityId = u16;
 
@@ -110,7 +113,7 @@ pub enum Packet {
 	ServerInfo           (ServerInfo),
 	DataTable,           // TODO
 	ClassInfo            (ClassInfo),
-	Pause,               // TODO
+	Pause                (bool),
 	CreateStringTable    (CreateStringTable),
 	UpdateStringTable    (UpdateStringTable),
 	VoiceInit            (VoiceInit),
@@ -128,7 +131,7 @@ pub enum Packet {
 	Entities             (Entities),
 	TempEntities         (TempEntities),
 	Prefetch             (Prefetch),
-	PluginMenu,          // TODO: { kind: u16, bytes_len: u16, data: [u8; bytes_len] }
+	PluginMenu           (PluginMenu),
 	GameEventList        (game_events::GameEventList),
 	GetCvar              // TODO: { cookie: u32, key: String }
 }
@@ -147,7 +150,7 @@ impl Packet {
 			Packet::ServerInfo(_) => PacketKind::ServerInfo,
 			Packet::DataTable => PacketKind::DataTable,
 			Packet::ClassInfo(_) => PacketKind::ClassInfo,
-			Packet::Pause => PacketKind::Pause,
+			Packet::Pause(_) => PacketKind::Pause,
 			Packet::CreateStringTable(_) => PacketKind::CreateStringTable,
 			Packet::UpdateStringTable(_) => PacketKind::UpdateStringTable,
 			Packet::VoiceInit(_) => PacketKind::VoiceInit,
@@ -165,7 +168,7 @@ impl Packet {
 			Packet::Entities(_) => PacketKind::Entities,
 			Packet::TempEntities(_) => PacketKind::TempEntities,
 			Packet::Prefetch(_) => PacketKind::Prefetch,
-			Packet::PluginMenu => PacketKind::PluginMenu,
+			Packet::PluginMenu(_) => PacketKind::PluginMenu,
 			Packet::GameEventList(_) => PacketKind::GameEventList,
 			Packet::GetCvar => PacketKind::GetCvar
 		}
@@ -184,7 +187,7 @@ impl Packet {
 			PacketKind::ServerInfo        => Packet::ServerInfo       (ServerInfo::parse(bits)),
 			PacketKind::DataTable         => unimplemented!(),
 			PacketKind::ClassInfo         => Packet::ClassInfo        (ClassInfo::parse(bits)),
-			PacketKind::Pause             => unimplemented!(),
+			PacketKind::Pause             => Packet::Pause            (bits.read_bit()),
 			PacketKind::CreateStringTable => Packet::CreateStringTable(CreateStringTable::parse(bits)),
 			PacketKind::UpdateStringTable => Packet::UpdateStringTable(UpdateStringTable::parse(bits)),
 			PacketKind::VoiceInit         => Packet::VoiceInit        (VoiceInit::parse(bits)),
@@ -202,7 +205,7 @@ impl Packet {
 			PacketKind::Entities          => Packet::Entities         (Entities::parse(bits)),
 			PacketKind::TempEntities      => Packet::TempEntities     (TempEntities::parse(bits)),
 			PacketKind::Prefetch          => Packet::Prefetch         (Prefetch::parse(bits)),
-			PacketKind::PluginMenu        => unimplemented!(),
+			PacketKind::PluginMenu        => Packet::PluginMenu       (PluginMenu::parse(bits)),
 			PacketKind::GameEventList     => Packet::GameEventList    (game_events::GameEventList::parse(bits)),
 			PacketKind::GetCvar           => unimplemented!()
 		}
@@ -320,7 +323,8 @@ pub struct ServerInfo {
 	pub client_dll_crc: u32,
 	/// The maximum amount of "classes". This amount matches the count of the class mappings found in the DataTables.
 	pub max_classes: u16,
-	pub _unknown0: [u8; 16],
+	// MapCRC in older versions
+	pub _unknown0: Result<[u8; 16], u32>,
 	/// Player slot that the client now occupies.
 	pub slot: u8,
 	/// Maximum amount of clients that the server can handle.
@@ -350,12 +354,14 @@ impl ServerInfo {
 			dedicated: bits.read_bit(),
 			client_dll_crc: bits.read_u32(),
 			max_classes: bits.read_u16(),
-			_unknown0: [
+			_unknown0: if USE_PROTOCOL >= 16_0 { Ok([
 				bits.read_u8(), bits.read_u8(), bits.read_u8(), bits.read_u8(),
 				bits.read_u8(), bits.read_u8(), bits.read_u8(), bits.read_u8(),
 				bits.read_u8(), bits.read_u8(), bits.read_u8(), bits.read_u8(),
 				bits.read_u8(), bits.read_u8(), bits.read_u8(), bits.read_u8()
-			],
+			]) } else {
+				Err(bits.read_u32())
+			},
 			slot: bits.read_u8(),
 			max_clients: bits.read_u8(),
 			tick_interval: bits.read_f32(),
@@ -364,7 +370,7 @@ impl ServerInfo {
 			map: bits.read_string().unwrap(),
 			sky: bits.read_string().unwrap(),
 			hostname: bits.read_string().unwrap(),
-			_unknown1: bits.read_bit()
+			_unknown1: if USE_PROTOCOL >= 16_0 { bits.read_bit() } else { false }
 		}
 	}
 }
@@ -683,6 +689,26 @@ impl Prefetch {
 		Prefetch {
 			unknown: if PREFETCH_HAS_TYPE_IDENTIFIER { bits.read_bit() } else { false },
 			id:      bits.read_bits(13) as u16
+		}
+	}
+}
+
+#[derive(Debug, Clone)]
+pub struct PluginMenu {
+	pub kind: u16,
+	/// KeyValues encoded into a byte buffer
+	pub data: Vec<u8>
+}
+
+impl PluginMenu {
+	pub fn parse<R>(bits: &mut BitReader<R>) -> Self where R: Read {
+		PluginMenu {
+			kind: bits.read_u16(),
+			data: {
+				let length = bits.read_u16();
+
+				bits.read_u8_array(length as usize)
+			}
 		}
 	}
 }

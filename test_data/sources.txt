@@ -1,3 +1,17 @@
-2013-04-10-Granary: https://old.reddit.com/r/tf2/comments/1c2zsp/democall_for_fragmovie/
+2013-04-10-Granary:      https://old.reddit.com/r/tf2/comments/1c2zsp/democall_for_fragmovie/
+2013-04-05-Badwater:     https://old.reddit.com/r/tf2/comments/1brqup/anyone_review_demo/
+2013-03-21-Upward:       https://old.reddit.com/r/tf2/comments/1brqup/anyone_review_demo/
 2013-02-19-ctf_haunt_b2: https://old.reddit.com/r/tf2/comments/18wl5z/totes_versus_riot_crew_match_ugc_iron_map_haunt/
-2012-06-29-Dustbowl: https://old.reddit.com/r/tf2/comments/vrmdw/74_points_as_medic_the_greatest_moment_ive_had_on/
+2012-07-23-Steel:        https://web.archive.org/web/20120723081234/http://tf2demos.com:80/sites/default/files/sites/default/demos/demo.dem
+2012-07-12-Gravelpit:    https://web.archive.org/web/20120723075024/http://tf2demos.com:80/sites/default/files/sites/default/demos/auto-20120712-2059-cp_gravelpit.dem
+2012-06-29-Dustbowl:     https://old.reddit.com/r/tf2/comments/vrmdw/74_points_as_medic_the_greatest_moment_ive_had_on/
+2010-04-07-Granary:      https://web.archive.org/web/20111212115919/http://www.ozfortress.com/media/download/4/2537/auto-20100407-2116-cp_granary.zip
+2010-04-07-Badlands:     https://web.archive.org/web/20110616170917/http://www.ozfortress.com/media/download/4/2538/owlse_div1_granfinal_clana_vs_rewound_badlands.zip
+2009-10-22-Granary:      https://web.archive.org/web/20100108051043/http://ozfortress.com/media/download/4/2217/eko_vs_boom_(CGi_cp_granary).zip
+2008-10-18-Granary:      https://web.archive.org/web/20110616205316/http://www.ozfortress.com/media/download/4/1917/ngri-081118-md-spade-finals.zip
+2008-10-18-Well:         https://web.archive.org/web/20110616205316/http://www.ozfortress.com/media/download/4/1917/ngri-081118-md-spade-finals.zip
+
+Hubs:
+ * https://web.archive.org/web/*/ozfortress.com/*
+ * https://web.archive.org/web/*/tf2demos.com/*
+ * https://old.reddit.com/r/tf2
