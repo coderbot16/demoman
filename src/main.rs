@@ -23,12 +23,12 @@ use byteorder::{ReadBytesExt, LittleEndian};
 //const PATH: &str = "/home/coderbot/.steam/steam/steamapps/common/Team Fortress 2/tf/demos/2018-07-28_22-43-39.dem";
 //const PATH: &str = "/home/coderbot/.steam/steam/steamapps/common/Team Fortress 2/tf/demos/2018-08-11_21-53-34.dem";
 //const PATH: &str = "/home/coderbot/.steam/steam/steamapps/common/Team Fortress 2/tf/demos/2016-12-07_18-25-34.dem";
-//const PATH: &str = "/home/coderbot/Programming/Rust IntelliJ/demoman/test_data/2013-04-10-Granary.dem";
-//const PATH: &str = "/home/coderbot/Programming/Rust IntelliJ/demoman/test_data/2013-02-19-ctf_haunt_b2.dem";
-//const PATH: &str = "/home/coderbot/Programming/Rust IntelliJ/demoman/test_data/2012-07-23-Steel.dem";
-//const PATH: &str = "/home/coderbot/Programming/Rust IntelliJ/demoman/test_data/2012-06-29-Dustbowl.dem";
-const PATH: &str = "/home/coderbot/Programming/Rust IntelliJ/demoman/test_data/2010-04-07-Badlands.dem";
-//const PATH: &str = "/home/coderbot/Programming/Rust IntelliJ/demoman/test_data/2009-10-22-Granary.dem";
+//const PATH: &str = "/home/coderbot/Source/TF2 Demo Test Data/2013-04-10-Granary.dem";
+//const PATH: &str = "/home/coderbot/Source/TF2 Demo Test Data/2013-02-19-ctf_haunt_b2.dem";
+//const PATH: &str = "/home/coderbot/Source/TF2 Demo Test Data/2012-07-23-Steel.dem";
+//const PATH: &str = "/home/coderbot/Source/TF2 Demo Test Data/2012-06-29-Dustbowl.dem";
+//const PATH: &str = "/home/coderbot/Source/TF2 Demo Test Data/2010-04-07-Badlands.dem";
+const PATH: &str = "/home/coderbot/Source/TF2 Demo Test Data/2009-10-22-Granary.dem";
 //const PATH: &str = "/home/coderbot/.steam/steam/steamapps/common/Half-Life 2/hl2/first.dem";
 
 //const MAX_PARSED_PACKETS: usize = 4096;
@@ -164,7 +164,7 @@ impl Handler for DumpVoiceData {
 				println!("{:?}", packet)
 			},
 			Packet::VoiceData(packet) => {
-				//print!("[Sender: {}, Proximity: {}, Bytes: {}] ", packet.sender, packet.proximity, packet.data.raw_bytes().len());
+				print!("[Sender: {}, Proximity: {}, Bytes: {}] ", packet.sender, packet.proximity, packet.data.raw_bytes().len());
 
 				if packet.data.bits_len() == 0 {
 					println!("[Voice Data Ack]");
