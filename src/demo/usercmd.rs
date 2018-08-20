@@ -1,6 +1,7 @@
 use byteorder::{LittleEndian, ReadBytesExt};
 use std::io::{self, Read, Cursor};
 use demo::bits::BitReader;
+use demo::parse::ParseError;
 
 /// Delta encoded UserCmd.
 /// None values represent that the value did not change.
@@ -22,7 +23,7 @@ pub struct UserCmdDelta {
 }
 
 impl UserCmdDelta {
-	pub fn parse<R: Read>(input: &mut R) -> io::Result<Self> {
+	pub fn parse<R: Read>(input: &mut R) -> Result<Self, ParseError> {
 		let sequence = input.read_u32::<LittleEndian>()?;
 		let len = input.read_u32::<LittleEndian>()?;
 
@@ -33,33 +34,33 @@ impl UserCmdDelta {
 		}
 
 		let mut cursor = Cursor::new(&mut data);
-		let mut reader = BitReader::new(&mut cursor, len as usize);
+		let mut reader = BitReader::new(&mut cursor, len as usize)?;
 
 		Ok(UserCmdDelta {
 			sequence,
-			command_number: if reader.read_bit() { Some(reader.read_u32()) } else { None },
-			tick_count:     if reader.read_bit() { Some(reader.read_u32()) } else { None },
+			command_number: if reader.read_bit()? { Some(reader.read_u32()?) } else { None },
+			tick_count:     if reader.read_bit()? { Some(reader.read_u32()?) } else { None },
 			view_angles: (
-				if reader.read_bit() { Some(reader.read_f32()) } else { None },
-				if reader.read_bit() { Some(reader.read_f32()) } else { None },
-				if reader.read_bit() { Some(reader.read_f32()) } else { None }
+				if reader.read_bit()? { Some(reader.read_f32()?) } else { None },
+				if reader.read_bit()? { Some(reader.read_f32()?) } else { None },
+				if reader.read_bit()? { Some(reader.read_f32()?) } else { None }
 			),
-			forward: if reader.read_bit() { Some(reader.read_f32()) } else { None },
-			side: if reader.read_bit() { Some(reader.read_f32()) } else { None },
-			up: if reader.read_bit() { Some(reader.read_f32()) } else { None },
-			buttons: if reader.read_bit() { Some(reader.read_u32()) } else { None },
-			impulse: if reader.read_bit() { Some(reader.read_u8()) } else { None },
-			weapon_select: if reader.read_bit() {
+			forward: if reader.read_bit()? { Some(reader.read_f32()?) } else { None },
+			side: if reader.read_bit()? { Some(reader.read_f32()?) } else { None },
+			up: if reader.read_bit()? { Some(reader.read_f32()?) } else { None },
+			buttons: if reader.read_bit()? { Some(reader.read_u32()?) } else { None },
+			impulse: if reader.read_bit()? { Some(reader.read_u8()?) } else { None },
+			weapon_select: if reader.read_bit()? {
 				Some((
-					reader.read_bits(11) as u16,
-					if reader.read_bit() { Some(reader.read_bits(6) as u8) } else { None }
+					reader.read_bits(11)? as u16,
+					if reader.read_bit()? { Some(reader.read_bits(6)? as u8) } else { None }
 				))
 			} else {
 				None
 			},
 			mouse_delta: (
-				if reader.read_bit() { Some(reader.read_i16()) } else { None },
-				if reader.read_bit() { Some(reader.read_i16()) } else { None }
+				if reader.read_bit()? { Some(reader.read_i16()?) } else { None },
+				if reader.read_bit()? { Some(reader.read_i16()?) } else { None }
 			)
 		})
 	}

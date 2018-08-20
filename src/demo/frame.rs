@@ -82,22 +82,22 @@ impl Frame {
 			},
 			FrameKind::DataTables => {
 				let len = input.read_u32::<LittleEndian>().unwrap();
-				let mut bits = BitReader::new(input, len as usize);
+				let mut bits = BitReader::new(input, len as usize).unwrap();
 
 				let tables = DataTables::parse(&mut bits);
 				assert_eq!(bits.unread_bytes(), 0);
 
-				FramePayload::DataTables(tables)
+				FramePayload::DataTables(tables.unwrap())
 			},
 			FrameKind::Stop => FramePayload::Stop,
 			FrameKind::StringTables => {
 				let len = input.read_u32::<LittleEndian>().unwrap();
-				let mut bits = BitReader::new(input, len as usize);
+				let mut bits = BitReader::new(input, len as usize).unwrap();
 
 				let tables = StringTables::parse(&mut bits);
 				assert_eq!(bits.unread_bytes(), 0);
 
-				FramePayload::StringTables(tables)
+				FramePayload::StringTables(tables.unwrap())
 			}
 		};
 

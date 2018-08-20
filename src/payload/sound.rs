@@ -1,4 +1,5 @@
 use demo::bits::BitReader;
+use demo::parse::ParseError;
 use std::io::Read;
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
@@ -46,31 +47,31 @@ impl SoundDelta {
 		}
 	}
 
-	pub fn parse<R>(bits: &mut BitReader<R>) -> Self where R: Read {
-		SoundDelta {
-			entity: if bits.read_bit() {
-				Some(bits.read_bits(11) as u16)
+	pub fn parse<R>(bits: &mut BitReader<R>) -> Result<Self, ParseError> where R: Read {
+		Ok(SoundDelta {
+			entity: if bits.read_bit()? {
+				Some(bits.read_bits(11)? as u16)
 			} else {
 				None
 			},
-			sound_index: if bits.read_bit() {
-				Some(bits.read_bits(13) as u16)
+			sound_index: if bits.read_bit()? {
+				Some(bits.read_bits(13)? as u16)
 			} else {
 				None
 			},
-			flags: if bits.read_bit() {
-				Some(Flags(bits.read_bits(9) as u16))
+			flags: if bits.read_bit()? {
+				Some(Flags(bits.read_bits(9)? as u16))
 			} else {
 				None
 			},
-			channel: if bits.read_bit() {
-				Some(Channel::from_id(bits.read_bits(3) as u8))
+			channel: if bits.read_bit()? {
+				Some(Channel::from_id(bits.read_bits(3)? as u8))
 			} else {
 				None
 			},
-			ambient: bits.read_bit(),
-			sentence: bits.read_bit()
-		}
+			ambient: bits.read_bit()?,
+			sentence: bits.read_bit()?
+		})
 	}
 }
 
@@ -118,16 +119,16 @@ pub enum SequenceUpdate {
 }
 
 impl SequenceUpdate {
-	pub fn parse<R>(bits: &mut BitReader<R>) -> Self where R: Read {
-		if bits.read_bit() {
+	pub fn parse<R>(bits: &mut BitReader<R>) -> Result<Self, ParseError> where R: Read {
+		Ok(if bits.read_bit()? {
 			SequenceUpdate::Unchanged
 		} else {
-			if bits.read_bit() {
+			if bits.read_bit()? {
 				SequenceUpdate::Increment
 			} else {
-				SequenceUpdate::Full(bits.read_bits(10) as u16)
+				SequenceUpdate::Full(bits.read_bits(10)? as u16)
 			}
-		}
+		})
 	}
 
 	pub fn derive(old: u16, new: u16) -> Self {

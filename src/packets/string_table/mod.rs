@@ -1,5 +1,6 @@
 use std::collections::VecDeque;
 use demo::bits::BitReader;
+use demo::parse::ParseError;
 use std::io::Read;
 
 mod create;
@@ -10,18 +11,18 @@ pub use self::create::NewStringTable;
 pub struct StringTables(pub Vec<(String, StringTablePair)>);
 
 impl StringTables {
-	pub fn parse<R>(bits: &mut BitReader<R>) -> Self where R: Read {
-		let count = bits.read_u8();
+	pub fn parse<R>(bits: &mut BitReader<R>) -> Result<Self, ParseError> where R: Read {
+		let count = bits.read_u8()?;
 		let mut tables = Vec::with_capacity(count as usize);
 		
 		for _ in 0..count {
-			let name = bits.read_string().unwrap();
-			let table = StringTablePair::parse(bits);
+			let name = bits.read_string()?;
+			let table = StringTablePair::parse(bits)?;
 
 			tables.push((name, table));
 		}
 
-		StringTables(tables)
+		Ok(StringTables(tables))
 	}
 }
 
@@ -35,11 +36,11 @@ pub struct StringTablePair {
 }
 
 impl StringTablePair {
-	pub fn parse<R>(bits: &mut BitReader<R>) -> Self where R: Read{
-		StringTablePair {
-			primary: StringTable::parse(bits),
-			client: if bits.read_bit() { Some(StringTable::parse(bits)) } else { None }
-		}
+	pub fn parse<R>(bits: &mut BitReader<R>) -> Result<Self, ParseError> where R: Read{
+		Ok(StringTablePair {
+			primary: StringTable::parse(bits)?,
+			client: if bits.read_bit()? { Some(StringTable::parse(bits)?) } else { None }
+		})
 	}
 }
 
@@ -82,17 +83,17 @@ impl StringTable {
 		self.capacity
 	}
 
-	pub fn parse<R>(bits: &mut BitReader<R>) -> Self where R: Read {
-		let count = bits.read_u16();
-		let mut strings = Vec::with_capacity(count as usize);
+	pub fn parse<R>(bits: &mut BitReader<R>) -> Result<Self, ParseError> where R: Read {
+		let count = bits.read_u16()?;
+		let mut strings = Vec::with_capacity(usize::from(count));
 
 		for _ in 0..count {
-			let string = bits.read_string().unwrap();
+			let string = bits.read_string()?;
 
-			let data = if bits.read_bit() {
-				let data_size = bits.read_u16() as usize;
+			let data = if bits.read_bit()? {
+				let data_size = usize::from(bits.read_u16()?);
 
-				Extra::Bytes(bits.read_u8_array(data_size))
+				Extra::Bytes(bits.read_u8_array(data_size)?)
 			} else {
 				Extra::None
 			};
@@ -100,35 +101,35 @@ impl StringTable {
 			strings.push((string, data));
 		}
 
-		StringTable {
+		Ok(StringTable {
 			strings,
 			capacity: None,
 			fixed_extra_size: None
-		}
+		})
 	}
 
-	pub fn update<R>(&mut self, bits: &mut BitReader<R>, updated: u16) where R: Read {
+	pub fn update<R>(&mut self, bits: &mut BitReader<R>, updated: u16) -> Result<(), ParseError> where R: Read {
 		let index_bits = (16 - (self.capacity.unwrap() as u16).leading_zeros()) as u8 - 1;
 
 		let mut tracker = StateTracker::new();
 
 		for _ in 0..updated {
-			let index = if bits.read_bit() { None } else { Some(bits.read_bits(index_bits)) };
+			let index = if bits.read_bit()? { None } else { Some(bits.read_bits(index_bits)?) };
 
 			let partial;
 			let string;
 
-			if bits.read_bit() {
-				partial = if bits.read_bit() {
+			if bits.read_bit()? {
+				partial = if bits.read_bit()? {
 					Some(Partial {
-						history_index: bits.read_bits(5) as u8,
-						matching: bits.read_bits(5) as u8
+						history_index: bits.read_bits(5)? as u8,
+						matching: bits.read_bits(5)? as u8
 					})
 				} else {
 					None
 				};
 
-				string = Some(bits.read_string().unwrap());
+				string = Some(bits.read_string()?);
 			} else {
 				partial = None;
 				string = None;
@@ -142,16 +143,16 @@ impl StringTable {
 
 			let (index, string) = tracker.read(row).expect("TODO: Handle invalid history index condition");
 
-			let extra = if bits.read_bit() {
+			let extra = if bits.read_bit()? {
 				match self.fixed_extra_size {
 					Some(bits_len) => {
-						let data = bits.read_bits(bits_len);
+						let data = bits.read_bits(bits_len)?;
 
 						Extra::Bits { count: bits_len, data: data as u16 }
 					}
 					None => {
-						let bytes = bits.read_bits(14) as u16;
-						let data = bits.read_u8_array(bytes as usize);
+						let bytes = bits.read_bits(14)? as u16;
+						let data = bits.read_u8_array(bytes as usize)?;
 
 						Extra::Bytes(data)
 					}
@@ -173,6 +174,8 @@ impl StringTable {
 				None => panic!("Invalid index in string table update!")
 			}
 		}
+
+		Ok(())
 	}
 }
 

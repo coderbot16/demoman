@@ -1,23 +1,24 @@
 use demo::bits::BitReader;
+use demo::parse::ParseError;
 use std::io::Read;
 
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub struct GameEventList(pub Vec<GameEventInfo>);
 
 impl GameEventList {
-	pub fn parse<R>(bits: &mut BitReader<R>) -> Self where R: Read {
-		let count = bits.read_bits(9);
-		let bits_len = bits.read_bits(20);
+	pub fn parse<R>(bits: &mut BitReader<R>) -> Result<Self, ParseError> where R: Read {
+		let count = bits.read_bits(9)?;
+		let bits_len = bits.read_bits(20)?;
 
 		let mut infos = Vec::with_capacity(count as usize);
 
 		for _ in 0..count {
-			infos.push(GameEventInfo::parse(bits));
+			infos.push(GameEventInfo::parse(bits)?);
 		}
 
 		// TODO: Verify bit length.
 
-		GameEventList(infos)
+		Ok(GameEventList(infos))
 	}
 }
 
@@ -58,21 +59,21 @@ pub struct GameEventInfo {
 }
 
 impl GameEventInfo {
-	pub fn parse<R>(bits: &mut BitReader<R>) -> Self where R: Read {
-		let index = bits.read_bits(9) as u16;
-		let name = bits.read_string().unwrap();
+	pub fn parse<R>(bits: &mut BitReader<R>) -> Result<Self, ParseError> where R: Read {
+		let index = bits.read_bits(9)? as u16;
+		let name = bits.read_string()?;
 		let mut properties = Vec::new();
 
 		loop {
-			let kind = Kind::from_id(bits.read_bits(3)).unwrap();
+			let kind = Kind::from_id(bits.read_bits(3)?).unwrap();
 
 			if kind == Kind::End {
 				break;
 			}
 
-			properties.push((kind, bits.read_string().unwrap()));
+			properties.push((kind, bits.read_string()?));
 		}
 
-		GameEventInfo { index, name, properties }
+		Ok(GameEventInfo { index, name, properties })
 	}
 }

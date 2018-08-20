@@ -208,7 +208,7 @@ impl Handler for ShowGameEvents {
 				//println!("GameEvent | Bits: {}", payload.bits_len() - 9);
 
 				let mut reader = payload.reader();
-				let id = reader.read_bits(9) as u16;
+				let id = reader.read_bits(9).unwrap() as u16;
 				let mut game_event = None;
 
 				if self.list.is_none() {
@@ -235,11 +235,11 @@ impl Handler for ShowGameEvents {
 					let value = match kind {
 						Kind::End    => unreachable!(),
 						Kind::Str    => Value::Str (reader.read_string().unwrap()),
-						Kind::F32    => Value::F32 (reader.read_f32()),
-						Kind::I32    => Value::I32 (reader.read_i32()),
-						Kind::I16    => Value::I16 (reader.read_i16()),
-						Kind::U8     => Value::U8  (reader.read_u8()),
-						Kind::Bool   => Value::Bool(reader.read_bit()),
+						Kind::F32    => Value::F32 (reader.read_f32().unwrap()),
+						Kind::I32    => Value::I32 (reader.read_i32().unwrap()),
+						Kind::I16    => Value::I16 (reader.read_i16().unwrap()),
+						Kind::U8     => Value::U8  (reader.read_u8().unwrap()),
+						Kind::Bool   => Value::Bool(reader.read_bit().unwrap()),
 						Kind::Unused => unimplemented!()
 					};
 
@@ -372,23 +372,7 @@ impl Handler for PrintAll {
 			},
 			Packet::SetEntityView(packet)    => println!("{}", packet),
 			Packet::FixAngle(packet)         => println!("{:?}", packet),
-			Packet::CrosshairAngle(packet)   => println!("{:?}", packet), /*{
-				// TODO: BROKEN
-
-				/*let angles = (
-					bits.read_u16(),
-					bits.read_u16(),
-					bits.read_u16()
-				);
-
-				let degrees = (
-					(angles.0 as f32) * 360.0 / 65536.0,
-					(angles.1 as f32) * 360.0 / 65536.0,
-					(angles.2 as f32) * 360.0 / 65536.0
-				);
-
-				println!("Angles (degrees): {:?} [raw: {:?}]", degrees, angles);*/
-			},*/
+			Packet::CrosshairAngle(packet)   => println!("{:?}", packet),
 			Packet::Decal(packet)            => println!("{:?}", packet),
 			Packet::TerrainMod               => unimplemented!(),
 			Packet::UserMessage(packet)      => println!("Channel: {}, Bits: {}", packet.channel, packet.data.bits_len()),
@@ -401,7 +385,7 @@ impl Handler for PrintAll {
 					return;
 				}
 
-				let id = payload.reader().read_bits(9);
+				let id = payload.reader().read_bits(9).unwrap();
 
 				println!("Event ID: {}, Bits: {}", id, payload.bits_len() - 9);
 			},
@@ -428,7 +412,7 @@ impl Handler for PrintAll {
 					let is_entity = remaining_headers >= 0;
 
 					let base_update_type = if is_entity {
-						Some(match (bits.read_bit(), bits.read_bit()) {
+						Some(match (bits.read_bit().unwrap(), bits.read_bit().unwrap()) {
 							(false, false) => UpdateType::Delta,
 							(false, true) => UpdateType::EnterPvs,
 							(true, false) => UpdateType::LeavePvs,
@@ -481,10 +465,10 @@ fn parse_update<H>(data: Vec<u8>, demo: &DemoHeader, handler: &mut H) where H: H
 	assert!(demo.network_protocol > 10, "Network protocols less than 10 do not have fixed_time and fixed_time_stdev in Tick, this is not handled yet!");
 
 	while bits.remaining_bits() >= packets::PACKET_KIND_BITS as usize {
-		let id = bits.read_bits(packets::PACKET_KIND_BITS);
+		let id = bits.read_bits(packets::PACKET_KIND_BITS).unwrap();
 
 		let kind = PacketKind::from_id(id as u8).expect("Packet ID cannot be greater than 31");
 
-		handler.packet(Packet::parse_with_kind(&mut bits, kind));
+		handler.packet(Packet::parse_with_kind(&mut bits, kind).unwrap());
 	}
 }

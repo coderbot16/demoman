@@ -2,6 +2,7 @@ pub mod game_events;
 pub mod string_table;
 
 use demo::bits::{BitReader, Bits};
+use demo::parse::ParseError;
 use std::io::Read;
 
 const USE_PROTOCOL: u32 = 15_0;
@@ -174,41 +175,41 @@ impl Packet {
 		}
 	}
 
-	pub fn parse_with_kind<R>(bits: &mut BitReader<R>, kind: PacketKind) -> Self where R: Read {
-		match kind {
+	pub fn parse_with_kind<R>(bits: &mut BitReader<R>, kind: PacketKind) -> Result<Self, ParseError> where R: Read {
+		Ok(match kind {
 			PacketKind::Nop               => Packet::Nop,
 			PacketKind::Disconnect        => unimplemented!(),
-			PacketKind::TransferFile      => Packet::TransferFile     (TransferFile::parse(bits)),
-			PacketKind::Tick              => Packet::Tick             (Tick::parse(bits)),
-			PacketKind::StringCommand     => Packet::StringCommand    (bits.read_string().unwrap()),
-			PacketKind::SetCvars          => Packet::SetCvars         (SetCvars::parse(bits)),
-			PacketKind::SignonState       => Packet::SignonState      (SignonState::parse(bits)),
-			PacketKind::Print             => Packet::Print            (bits.read_string().unwrap()),
-			PacketKind::ServerInfo        => Packet::ServerInfo       (ServerInfo::parse(bits)),
+			PacketKind::TransferFile      => Packet::TransferFile     (TransferFile::parse(bits)?),
+			PacketKind::Tick              => Packet::Tick             (Tick::parse(bits)?),
+			PacketKind::StringCommand     => Packet::StringCommand    (bits.read_string()?),
+			PacketKind::SetCvars          => Packet::SetCvars         (SetCvars::parse(bits)?),
+			PacketKind::SignonState       => Packet::SignonState      (SignonState::parse(bits)?),
+			PacketKind::Print             => Packet::Print            (bits.read_string()?),
+			PacketKind::ServerInfo        => Packet::ServerInfo       (ServerInfo::parse(bits)?),
 			PacketKind::DataTable         => unimplemented!(),
-			PacketKind::ClassInfo         => Packet::ClassInfo        (ClassInfo::parse(bits)),
-			PacketKind::Pause             => Packet::Pause            (bits.read_bit()),
-			PacketKind::CreateStringTable => Packet::CreateStringTable(CreateStringTable::parse(bits)),
-			PacketKind::UpdateStringTable => Packet::UpdateStringTable(UpdateStringTable::parse(bits)),
-			PacketKind::VoiceInit         => Packet::VoiceInit        (VoiceInit::parse(bits)),
-			PacketKind::VoiceData         => Packet::VoiceData        (VoiceData::parse(bits)),
+			PacketKind::ClassInfo         => Packet::ClassInfo        (ClassInfo::parse(bits)?),
+			PacketKind::Pause             => Packet::Pause            (bits.read_bit()?),
+			PacketKind::CreateStringTable => Packet::CreateStringTable(CreateStringTable::parse(bits)?),
+			PacketKind::UpdateStringTable => Packet::UpdateStringTable(UpdateStringTable::parse(bits)?),
+			PacketKind::VoiceInit         => Packet::VoiceInit        (VoiceInit::parse(bits)?),
+			PacketKind::VoiceData         => Packet::VoiceData        (VoiceData::parse(bits)?),
 			PacketKind::HltvControl       => unimplemented!(),
-			PacketKind::PlaySound         => Packet::PlaySound        (PlaySound::parse(bits)),
-			PacketKind::SetEntityView     => Packet::SetEntityView    (bits.read_bits(11) as u16),
-			PacketKind::FixAngle          => Packet::FixAngle         (FixAngle::parse(bits)),
-			PacketKind::CrosshairAngle    => Packet::CrosshairAngle   (CrosshairAngle::parse(bits)),
-			PacketKind::Decal             => Packet::Decal            (Decal::parse(bits)),
+			PacketKind::PlaySound         => Packet::PlaySound        (PlaySound::parse(bits)?),
+			PacketKind::SetEntityView     => Packet::SetEntityView    (bits.read_bits(11)? as u16),
+			PacketKind::FixAngle          => Packet::FixAngle         (FixAngle::parse(bits)?),
+			PacketKind::CrosshairAngle    => Packet::CrosshairAngle   (CrosshairAngle::parse(bits)?),
+			PacketKind::Decal             => Packet::Decal            (Decal::parse(bits)?),
 			PacketKind::TerrainMod        => unimplemented!(),
-			PacketKind::UserMessage       => Packet::UserMessage      (UserMessage::parse(bits)),
-			PacketKind::EntityMessage     => Packet::EntityMessage    (EntityMessage::parse(bits)),
-			PacketKind::GameEvent         => Packet::GameEvent        (GameEvent::parse(bits)),
-			PacketKind::Entities          => Packet::Entities         (Entities::parse(bits)),
-			PacketKind::TempEntities      => Packet::TempEntities     (TempEntities::parse(bits)),
-			PacketKind::Prefetch          => Packet::Prefetch         (Prefetch::parse(bits)),
-			PacketKind::PluginMenu        => Packet::PluginMenu       (PluginMenu::parse(bits)),
-			PacketKind::GameEventList     => Packet::GameEventList    (game_events::GameEventList::parse(bits)),
+			PacketKind::UserMessage       => Packet::UserMessage      (UserMessage::parse(bits)?),
+			PacketKind::EntityMessage     => Packet::EntityMessage    (EntityMessage::parse(bits)?),
+			PacketKind::GameEvent         => Packet::GameEvent        (GameEvent::parse(bits)?),
+			PacketKind::Entities          => Packet::Entities         (Entities::parse(bits)?),
+			PacketKind::TempEntities      => Packet::TempEntities     (TempEntities::parse(bits)?),
+			PacketKind::Prefetch          => Packet::Prefetch         (Prefetch::parse(bits)?),
+			PacketKind::PluginMenu        => Packet::PluginMenu       (PluginMenu::parse(bits)?),
+			PacketKind::GameEventList     => Packet::GameEventList    (game_events::GameEventList::parse(bits)?),
 			PacketKind::GetCvar           => unimplemented!()
-		}
+		})
 	}
 }
 
@@ -221,12 +222,12 @@ pub struct TransferFile {
 }
 
 impl TransferFile {
-	pub fn parse<R>(bits: &mut BitReader<R>) -> Self where R: Read {
-		TransferFile {
-			transfer_id: bits.read_u32(),
-			name: bits.read_string().unwrap(),
-			request_or_deny: bits.read_bit()
-		}
+	pub fn parse<R>(bits: &mut BitReader<R>) -> Result<Self, ParseError> where R: Read {
+		Ok(TransferFile {
+			transfer_id: bits.read_u32()?,
+			name: bits.read_string()?,
+			request_or_deny: bits.read_bit()?
+		})
 	}
 }
 
@@ -241,12 +242,12 @@ pub struct Tick {
 }
 
 impl Tick {
-	pub fn parse<R>(bits: &mut BitReader<R>) -> Self where R: Read {
-		Tick {
-			number: bits.read_u32(),
-			fixed_time: bits.read_u16(),
-			fixed_time_stdev: bits.read_u16()
-		}
+	pub fn parse<R>(bits: &mut BitReader<R>) -> Result<Self, ParseError> where R: Read {
+		Ok(Tick {
+			number: bits.read_u32()?,
+			fixed_time: bits.read_u16()?,
+			fixed_time_stdev: bits.read_u16()?
+		})
 	}
 }
 
@@ -254,15 +255,15 @@ impl Tick {
 pub struct SetCvars(pub Vec<(String, String)>);
 
 impl SetCvars {
-	pub fn parse<R>(bits: &mut BitReader<R>) -> Self where R: Read {
-		let count = bits.read_u8();
+	pub fn parse<R>(bits: &mut BitReader<R>) -> Result<Self, ParseError> where R: Read {
+		let count = bits.read_u8()?;
 		let mut cvars = Vec::new();
 
 		for _ in 0..count {
-			cvars.push((bits.read_string().unwrap(), bits.read_string().unwrap()));
+			cvars.push((bits.read_string()?, bits.read_string()?));
 		}
 
-		SetCvars(cvars)
+		Ok(SetCvars(cvars))
 	}
 }
 
@@ -301,11 +302,11 @@ pub struct SignonState {
 }
 
 impl SignonState {
-	pub fn parse<R>(bits: &mut BitReader<R>) -> Self where R: Read {
-		SignonState {
-			state: SignonStateKind::from_id(bits.read_u8()),
-			server_count: bits.read_u32()
-		}
+	pub fn parse<R>(bits: &mut BitReader<R>) -> Result<Self, ParseError> where R: Read {
+		Ok(SignonState {
+			state: SignonStateKind::from_id(bits.read_u8()?),
+			server_count: bits.read_u32()?
+		})
 	}
 }
 
@@ -346,32 +347,32 @@ pub struct ServerInfo {
 }
 
 impl ServerInfo {
-	pub fn parse<R>(bits: &mut BitReader<R>) -> Self where R: Read {
-		ServerInfo {
-			network_protocol: bits.read_u16(),
-			server_count: bits.read_u32(),
-			hltv: bits.read_bit(),
-			dedicated: bits.read_bit(),
-			client_dll_crc: bits.read_u32(),
-			max_classes: bits.read_u16(),
+	pub fn parse<R>(bits: &mut BitReader<R>) -> Result<Self, ParseError> where R: Read {
+		Ok(ServerInfo {
+			network_protocol: bits.read_u16()?,
+			server_count: bits.read_u32()?,
+			hltv: bits.read_bit()?,
+			dedicated: bits.read_bit()?,
+			client_dll_crc: bits.read_u32()?,
+			max_classes: bits.read_u16()?,
 			_unknown0: if USE_PROTOCOL >= 16_0 { Ok([
-				bits.read_u8(), bits.read_u8(), bits.read_u8(), bits.read_u8(),
-				bits.read_u8(), bits.read_u8(), bits.read_u8(), bits.read_u8(),
-				bits.read_u8(), bits.read_u8(), bits.read_u8(), bits.read_u8(),
-				bits.read_u8(), bits.read_u8(), bits.read_u8(), bits.read_u8()
+				bits.read_u8()?, bits.read_u8()?, bits.read_u8()?, bits.read_u8()?,
+				bits.read_u8()?, bits.read_u8()?, bits.read_u8()?, bits.read_u8()?,
+				bits.read_u8()?, bits.read_u8()?, bits.read_u8()?, bits.read_u8()?,
+				bits.read_u8()?, bits.read_u8()?, bits.read_u8()?, bits.read_u8()?
 			]) } else {
-				Err(bits.read_u32())
+				Err(bits.read_u32()?)
 			},
-			slot: bits.read_u8(),
-			max_clients: bits.read_u8(),
-			tick_interval: bits.read_f32(),
-			os: bits.read_u8(),
-			game_directory: bits.read_string().unwrap(),
-			map: bits.read_string().unwrap(),
-			sky: bits.read_string().unwrap(),
-			hostname: bits.read_string().unwrap(),
-			_unknown1: if USE_PROTOCOL >= 16_0 { bits.read_bit() } else { false }
-		}
+			slot: bits.read_u8()?,
+			max_clients: bits.read_u8()?,
+			tick_interval: bits.read_f32()?,
+			os: bits.read_u8()?,
+			game_directory: bits.read_string()?,
+			map: bits.read_string()?,
+			sky: bits.read_string()?,
+			hostname: bits.read_string()?,
+			_unknown1: if USE_PROTOCOL >= 16_0 { bits.read_bit()? } else { false }
+		})
 	}
 }
 
@@ -382,16 +383,16 @@ pub struct ClassInfo {
 }
 
 impl ClassInfo {
-	pub fn parse<R>(bits: &mut BitReader<R>) -> Self where R: Read {
-		let classes = bits.read_u16();
-		let no_parse = bits.read_bit();
+	pub fn parse<R>(bits: &mut BitReader<R>) -> Result<Self, ParseError> where R: Read {
+		let classes = bits.read_u16()?;
+		let no_parse = bits.read_bit()?;
 
 		assert!(no_parse, "Don't know how to parse the body of ClassInfo!");
 
-		ClassInfo {
+		Ok(ClassInfo {
 			classes,
 			info: None
-		}
+		})
 	}
 }
 
@@ -406,28 +407,28 @@ pub struct CreateStringTable {
 }
 
 impl CreateStringTable {
-	pub fn parse<R>(bits: &mut BitReader<R>) -> Self where R: Read {
-		let name = bits.read_string().unwrap();
-		let max_entries = bits.read_u16();
+	pub fn parse<R>(bits: &mut BitReader<R>) -> Result<Self, ParseError> where R: Read {
+		let name = bits.read_string()?;
+		let max_entries = bits.read_u16()?;
 
 		assert_ne!(max_entries, 0);
 
 		let index_bits = (16 - max_entries.leading_zeros()) as u8 - 1;
-		let entries = bits.read_bits(index_bits + 1) as u16;
-		let bits_len = if USE_VAR_U32 { bits.read_var_u32() } else { bits.read_bits(20) };
+		let entries = bits.read_bits(index_bits + 1)? as u16;
+		let bits_len = if USE_VAR_U32 { bits.read_var_u32()? } else { bits.read_bits(20)? };
 
 		// Size and Bits Size
-		let fixed_userdata_size = if bits.read_bit()  {
-			Some((bits.read_bits(12) as u16, bits.read_bits(4) as u8))
+		let fixed_userdata_size = if bits.read_bit()?  {
+			Some((bits.read_bits(12)? as u16, bits.read_bits(4)? as u8))
 		} else {
 			None
 		};
 
-		let compressed = bits.read_bit();
+		let compressed = bits.read_bit()?;
 
-		let data = Bits::copy_into(bits, bits_len as usize);
+		let data = Bits::copy_into(bits, bits_len as usize)?;
 
-		CreateStringTable { name, max_entries, entries, fixed_userdata_size, compressed, data }
+		Ok(CreateStringTable { name, max_entries, entries, fixed_userdata_size, compressed, data })
 	}
 }
 
@@ -439,15 +440,15 @@ pub struct UpdateStringTable {
 }
 
 impl UpdateStringTable {
-	pub fn parse<R>(bits: &mut BitReader<R>) -> Self where R: Read {
-		UpdateStringTable {
-			table_id: bits.read_bits(5) as u8,
-			entries: if bits.read_bit() { bits.read_u16() } else { 1 },
+	pub fn parse<R>(bits: &mut BitReader<R>) -> Result<Self, ParseError> where R: Read {
+		Ok(UpdateStringTable {
+			table_id: bits.read_bits(5)? as u8,
+			entries: if bits.read_bit()? { bits.read_u16()? } else { 1 },
 			data: {
-				let bits_len = bits.read_bits(20) as usize;
-				Bits::copy_into(bits, bits_len)
+				let bits_len = bits.read_bits(20)? as usize;
+				Bits::copy_into(bits, bits_len)?
 			}
-		}
+		})
 	}
 }
 
@@ -459,12 +460,12 @@ pub struct VoiceInit {
 }
 
 impl VoiceInit {
-	pub fn parse<R>(bits: &mut BitReader<R>) -> Self where R: Read {
-		VoiceInit {
-			codec:   bits.read_string().unwrap(),
-			quality: bits.read_u8(),
-			unknown: if VOICEINIT_HAS_EXTRA_FIELD { Some(bits.read_u16()) } else { None }
-		}
+	pub fn parse<R>(bits: &mut BitReader<R>) -> Result<Self, ParseError> where R: Read {
+		Ok(VoiceInit {
+			codec:   bits.read_string()?,
+			quality: bits.read_u8()?,
+			unknown: if VOICEINIT_HAS_EXTRA_FIELD { Some(bits.read_u16()?) } else { None }
+		})
 	}
 }
 
@@ -476,16 +477,16 @@ pub struct VoiceData {
 }
 
 impl VoiceData {
-	pub fn parse<R>(bits: &mut BitReader<R>) -> Self where R: Read {
-		VoiceData {
-			sender: bits.read_u8(),
-			proximity: bits.read_u8(),
+	pub fn parse<R>(bits: &mut BitReader<R>) -> Result<Self, ParseError> where R: Read {
+		Ok(VoiceData {
+			sender: bits.read_u8()?,
+			proximity: bits.read_u8()?,
 			data: {
-				let len = bits.read_u16();
+				let bits_len = bits.read_u16()?;
 
-				Bits::copy_into(bits, len as usize)
+				Bits::copy_into(bits, bits_len as usize)?
 			}
-		}
+		})
 	}
 }
 
@@ -496,19 +497,19 @@ pub enum PlaySound {
 }
 
 impl PlaySound {
-	pub fn parse<R>(bits: &mut BitReader<R>) -> Self where R: Read {
-		let reliable = bits.read_bit();
+	pub fn parse<R>(bits: &mut BitReader<R>) -> Result<Self, ParseError> where R: Read {
+		let reliable = bits.read_bit()?;
 
-		if reliable {
-			let bit_len = bits.read_u8();
+		Ok(if reliable {
+			let bits_len = bits.read_u8()?;
 
-			PlaySound::Reliable(Bits::copy_into(bits, bit_len as usize))
+			PlaySound::Reliable(Bits::copy_into(bits, bits_len as usize)?)
 		} else {
-			let sounds = bits.read_u8();
-			let bit_len = bits.read_u16();
+			let sounds = bits.read_u8()?;
+			let bits_len = bits.read_u16()?;
 
-			PlaySound::Unreliable { sounds, all: Bits::copy_into(bits, bit_len as usize) }
-		}
+			PlaySound::Unreliable { sounds, all: Bits::copy_into(bits, bits_len as usize)? }
+		})
 	}
 }
 
@@ -519,15 +520,15 @@ pub struct FixAngle {
 }
 
 impl FixAngle {
-	pub fn parse<R>(bits: &mut BitReader<R>) -> Self where R: Read {
-		FixAngle {
-			relative: bits.read_bit(),
+	pub fn parse<R>(bits: &mut BitReader<R>) -> Result<Self, ParseError> where R: Read {
+		Ok(FixAngle {
+			relative: bits.read_bit()?,
 			angles: (
-				bits.read_u16(),
-				bits.read_u16(),
-				bits.read_u16()
+				bits.read_u16()?,
+				bits.read_u16()?,
+				bits.read_u16()?
 			)
-		}
+		})
 	}
 }
 
@@ -537,14 +538,14 @@ pub struct CrosshairAngle {
 }
 
 impl CrosshairAngle {
-	pub fn parse<R>(bits: &mut BitReader<R>) -> Self where R: Read {
-		CrosshairAngle {
+	pub fn parse<R>(bits: &mut BitReader<R>) -> Result<Self, ParseError> where R: Read {
+		Ok(CrosshairAngle {
 			angles: (
-				bits.read_u16(),
-				bits.read_u16(),
-				bits.read_u16()
+				bits.read_u16()?,
+				bits.read_u16()?,
+				bits.read_u16()?
 			)
-		}
+		})
 	}
 }
 
@@ -558,19 +559,19 @@ pub struct Decal {
 }
 
 impl Decal {
-	pub fn parse<R>(bits: &mut BitReader<R>) -> Self where R: Read {
-		let position = bits.read_vec3();
-		let decal_index = bits.read_bits(9) as u16;
+	pub fn parse<R>(bits: &mut BitReader<R>) -> Result<Self, ParseError> where R: Read {
+		let position = bits.read_vec3()?;
+		let decal_index = bits.read_bits(9)? as u16;
 
-		let (entity_index, model_index) = if bits.read_bit() {
-			(bits.read_bits(11) as u16, bits.read_bits(MODEL_INDEX_BITS) as u16)
+		let (entity_index, model_index) = if bits.read_bit()? {
+			(bits.read_bits(11)? as u16, bits.read_bits(MODEL_INDEX_BITS)? as u16)
 		} else {
 			(0, 0)
 		};
 
-		let low_priority = bits.read_bit();
+		let low_priority = bits.read_bit()?;
 
-		Decal { position, decal_index, entity_index, model_index, low_priority }
+		Ok(Decal { position, decal_index, entity_index, model_index, low_priority })
 	}
 }
 
@@ -581,14 +582,14 @@ pub struct UserMessage {
 }
 
 impl UserMessage {
-	pub fn parse<R>(bits: &mut BitReader<R>) -> Self where R: Read {
-		UserMessage {
-			channel: bits.read_u8(),
+	pub fn parse<R>(bits: &mut BitReader<R>) -> Result<Self, ParseError> where R: Read {
+		Ok(UserMessage {
+			channel: bits.read_u8()?,
 			data: {
-				let bits_len = bits.read_bits(11) as usize;
-				Bits::copy_into(bits, bits_len)
+				let bits_len = bits.read_bits(11)? as usize;
+				Bits::copy_into(bits, bits_len)?
 			}
-		}
+		})
 	}
 }
 
@@ -600,15 +601,15 @@ pub struct EntityMessage {
 }
 
 impl EntityMessage {
-	pub fn parse<R>(bits: &mut BitReader<R>) -> Self where R: Read {
-		EntityMessage {
-			entity: bits.read_bits(11) as u16,
-			class:  bits.read_bits(9) as u16,
+	pub fn parse<R>(bits: &mut BitReader<R>) -> Result<Self, ParseError> where R: Read {
+		Ok(EntityMessage {
+			entity: bits.read_bits(11)? as u16,
+			class:  bits.read_bits(9)? as u16,
 			data: {
-				let bits_len = bits.read_bits(11) as usize;
-				Bits::copy_into(bits, bits_len)
+				let bits_len = bits.read_bits(11)? as usize;
+				Bits::copy_into(bits, bits_len)?
 			}
-		}
+		})
 	}
 }
 
@@ -617,10 +618,10 @@ impl EntityMessage {
 pub struct GameEvent(pub Bits);
 
 impl GameEvent {
-	pub fn parse<R>(bits: &mut BitReader<R>) -> Self where R: Read {
-		let bits_len = bits.read_bits(11) as usize;
+	pub fn parse<R>(bits: &mut BitReader<R>) -> Result<Self, ParseError> where R: Read {
+		let bits_len = bits.read_bits(11)? as usize;
 
-		GameEvent(Bits::copy_into(bits, bits_len))
+		Ok(GameEvent(Bits::copy_into(bits, bits_len)?))
 	}
 }
 
@@ -635,28 +636,28 @@ pub struct Entities {
 }
 
 impl Entities {
-	pub fn parse<R>(bits: &mut BitReader<R>) -> Self where R: Read {
-		let max_entries = bits.read_bits(11) as u16;
+	pub fn parse<R>(bits: &mut BitReader<R>) -> Result<Self, ParseError> where R: Read {
+		let max_entries = bits.read_bits(11)? as u16;
 
-		let delta_from_tick = if bits.read_bit() {
-			Some(bits.read_u32())
+		let delta_from_tick = if bits.read_bit()? {
+			Some(bits.read_u32()?)
 		} else {
 			None
 		};
 
-		let baseline = bits.read_bit();
-		let updated = bits.read_bits(11) as u16;
-		let bits_len = bits.read_bits(20) as usize;
-		let update_baseline = bits.read_bit();
+		let baseline = bits.read_bit()?;
+		let updated = bits.read_bits(11)? as u16;
+		let bits_len = bits.read_bits(20)? as usize;
+		let update_baseline = bits.read_bit()?;
 
-		Entities {
+		Ok(Entities {
 			max_entries,
 			delta_from_tick,
 			baseline,
 			updated,
 			update_baseline,
-			data: Bits::copy_into(bits, bits_len)
-		}
+			data: Bits::copy_into(bits, bits_len)?
+		})
 	}
 }
 
@@ -666,14 +667,14 @@ pub struct TempEntities {
 }
 
 impl TempEntities {
-	pub fn parse<R>(bits: &mut BitReader<R>) -> Self where R: Read {
-		let count = bits.read_u8();
-		let bits_len = if USE_VAR_U32 { bits.read_var_u32() } else {bits.read_bits(17) };
+	pub fn parse<R>(bits: &mut BitReader<R>) -> Result<Self, ParseError> where R: Read {
+		let count = bits.read_u8()?;
+		let bits_len = if USE_VAR_U32 { bits.read_var_u32()? } else {bits.read_bits(17)? };
 
-		TempEntities {
+		Ok(TempEntities {
 			count,
-			data: Bits::copy_into(bits, bits_len as usize)
-		}
+			data: Bits::copy_into(bits, bits_len as usize)?
+		})
 	}
 }
 
@@ -685,11 +686,11 @@ pub struct Prefetch {
 }
 
 impl Prefetch {
-	pub fn parse<R>(bits: &mut BitReader<R>) -> Self where R: Read {
-		Prefetch {
-			unknown: if PREFETCH_HAS_TYPE_IDENTIFIER { bits.read_bit() } else { false },
-			id:      bits.read_bits(13) as u16
-		}
+	pub fn parse<R>(bits: &mut BitReader<R>) -> Result<Self, ParseError> where R: Read {
+		Ok(Prefetch {
+			unknown: if PREFETCH_HAS_TYPE_IDENTIFIER { bits.read_bit()? } else { false },
+			id:      bits.read_bits(13)? as u16
+		})
 	}
 }
 
@@ -701,14 +702,14 @@ pub struct PluginMenu {
 }
 
 impl PluginMenu {
-	pub fn parse<R>(bits: &mut BitReader<R>) -> Self where R: Read {
-		PluginMenu {
-			kind: bits.read_u16(),
+	pub fn parse<R>(bits: &mut BitReader<R>) -> Result<Self, ParseError> where R: Read {
+		Ok(PluginMenu {
+			kind: bits.read_u16()?,
 			data: {
-				let length = bits.read_u16();
+				let length = bits.read_u16()?;
 
-				bits.read_u8_array(length as usize)
+				bits.read_u8_array(length as usize)?
 			}
-		}
+		})
 	}
 }

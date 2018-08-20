@@ -1,5 +1,6 @@
 use std::io::Read;
 use demo::bits::BitReader;
+use demo::parse::ParseError;
 use std::fmt::{self, Display, Formatter};
 
 #[derive(Debug, PartialEq, Clone)]
@@ -9,20 +10,20 @@ pub struct DataTables {
 }
 
 impl DataTables {
-	pub fn parse<R>(bits: &mut BitReader<R>) -> Self where R: Read {
+	pub fn parse<R>(bits: &mut BitReader<R>) -> Result<Self, ParseError> where R: Read {
 		let mut tables = Vec::new();
 
-		while bits.read_bit() {
-			tables.push(DataTable::parse(bits));
+		while bits.read_bit()? {
+			tables.push(DataTable::parse(bits)?);
 		}
 
-		let mut links = Vec::with_capacity(bits.read_u16() as usize);
+		let mut links = Vec::with_capacity(bits.read_u16()? as usize);
 
 		for _ in 0..links.capacity() {
-			links.push(ClassLink::parse(bits));
+			links.push(ClassLink::parse(bits)?);
 		}
 
-		DataTables { tables, links }
+		Ok(DataTables { tables, links })
 	}
 }
 
@@ -34,12 +35,12 @@ pub struct ClassLink {
 }
 
 impl ClassLink {
-	pub fn parse<R>(bits: &mut BitReader<R>) -> Self where R: Read {
-		let index = bits.read_u16();
-		let name = bits.read_string().unwrap();
-		let table = bits.read_string().unwrap();
+	pub fn parse<R>(bits: &mut BitReader<R>) -> Result<Self, ParseError> where R: Read {
+		let index = bits.read_u16()?;
+		let name = bits.read_string()?;
+		let table = bits.read_string()?;
 
-		ClassLink { index, name, table }
+		Ok(ClassLink { index, name, table })
 	}
 }
 
@@ -51,22 +52,22 @@ pub struct DataTable {
 }
 
 impl DataTable {
-	pub fn parse<R>(bits: &mut BitReader<R>) -> Self where R: Read {
-		let needs_decoder = bits.read_bit();
-		let name = bits.read_string().unwrap();
-		let entries = bits.read_bits(10);
+	pub fn parse<R>(bits: &mut BitReader<R>) -> Result<Self, ParseError> where R: Read {
+		let needs_decoder = bits.read_bit()?;
+		let name = bits.read_string()?;
+		let entries = bits.read_bits(10)?;
 
 		let mut rows = Vec::with_capacity(entries as usize);
 
 		for _ in 0..entries {
-			rows.push(Row::parse(bits));
+			rows.push(Row::parse(bits)?);
 		}
 
-		DataTable {
+		Ok(DataTable {
 			needs_decoder,
 			name,
 			rows
-		}
+		})
 	}
 }
 
@@ -78,28 +79,28 @@ pub struct Row {
 }
 
 impl Row {
-	pub fn parse<R>(bits: &mut BitReader<R>) -> Self where R: Read {
-		let kind = RowKind::from_id(bits.read_bits(5)).unwrap();
+	pub fn parse<R>(bits: &mut BitReader<R>) -> Result<Self, ParseError> where R: Read {
+		let kind = RowKind::from_id(bits.read_bits(5)?).unwrap();
 
-		let name = bits.read_string().unwrap();
-		let flags = Flags(bits.read_u16());
+		let name = bits.read_string()?;
+		let flags = Flags(bits.read_u16()?);
 
 		let data = if kind == RowKind::Table {
-			let name = bits.read_string().unwrap();
+			let name = bits.read_string()?;
 
 			RowData::Table { name }
 		} else if flags.has(Flag::Exclude) {
-			let exclusion = bits.read_string().unwrap();
+			let exclusion = bits.read_string()?;
 
 			RowData::Exclude { exclusion }
 		} else if kind == RowKind::Array {
-			let max_elements = bits.read_bits(10) as u16;
+			let max_elements = bits.read_bits(10)? as u16;
 
 			RowData::Array { max_elements }
 		} else {
-			let low = bits.read_f32();
-			let high = bits.read_f32();
-			let bits = bits.read_bits(7) as u8;
+			let low = bits.read_f32()?;
+			let high = bits.read_f32()?;
+			let bits = bits.read_bits(7)? as u8;
 
 			match kind {
 				RowKind::Integer => RowData::Integer { bits },
@@ -112,7 +113,7 @@ impl Row {
 			}
 		};
 
-		Row { name, flags, data }
+		Ok(Row { name, flags, data })
 	}
 }
 
