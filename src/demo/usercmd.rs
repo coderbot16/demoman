@@ -7,7 +7,6 @@ use demo::parse::ParseError;
 /// None values represent that the value did not change.
 #[derive(Debug, Copy, Clone)]
 pub struct UserCmdDelta {
-	pub sequence: u32,
 	/// If None, then command_number is the last number + 1.
 	command_number: Option<u32>,
 	/// If None, then tick_count is the last count + 1.
@@ -23,21 +22,8 @@ pub struct UserCmdDelta {
 }
 
 impl UserCmdDelta {
-	pub fn parse<R: Read>(input: &mut R) -> Result<Self, ParseError> {
-		let sequence = input.read_u32::<LittleEndian>()?;
-		let len = input.read_u32::<LittleEndian>()?;
-
-		let mut data = Vec::with_capacity(len as usize);
-
-		for _ in 0..len {
-			data.push(input.read_u8()?);
-		}
-
-		let mut cursor = Cursor::new(&mut data);
-		let mut reader = BitReader::new(&mut cursor, len as usize)?;
-
+	pub fn parse(reader: &mut BitReader) -> Result<Self, ParseError> {
 		Ok(UserCmdDelta {
-			sequence,
 			command_number: if reader.read_bit()? { Some(reader.read_u32()?) } else { None },
 			tick_count:     if reader.read_bit()? { Some(reader.read_u32()?) } else { None },
 			view_angles: (

@@ -1,6 +1,5 @@
 use demo::bits::BitReader;
 use demo::parse::ParseError;
-use std::io::Cursor;
 use packets::string_table::StringTable;
 use packets::CreateStringTable;
 
@@ -78,8 +77,7 @@ impl NewStringTable {
 				}
 			};
 
-			let mut cursor = Cursor::new(&uncompressed);
-			let mut bits = BitReader::new(&mut cursor, uncompressed_size as usize)?;
+			let mut bits = BitReader::new(&uncompressed);
 
 			table.update(&mut bits, packet.entries);
 		} else {

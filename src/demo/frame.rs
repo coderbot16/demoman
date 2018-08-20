@@ -78,13 +78,24 @@ impl Frame {
 				FramePayload::ConsoleCommand(String::from_utf8(data)?)
 			},
 			FrameKind::UserCmdDelta => {
-				let delta = UserCmdDelta::parse(input)?;
+				let sequence = input.read_u32::<LittleEndian>()?;
 
-				FramePayload::UserCmdDelta(delta)
+				let len = input.read_u32::<LittleEndian>()?;
+				let mut buf = vec![0; len as usize];
+				input.read_exact(&mut buf);
+
+				let mut bits = BitReader::new(&buf);
+
+				let delta = UserCmdDelta::parse(&mut bits)?;
+
+				FramePayload::UserCmdDelta { sequence, delta }
 			},
 			FrameKind::DataTables => {
 				let len = input.read_u32::<LittleEndian>()?;
-				let mut bits = BitReader::new(input, len as usize)?;
+				let mut buf = vec![0; len as usize];
+				input.read_exact(&mut buf);
+
+				let mut bits = BitReader::new(&buf);
 
 				let tables = DataTables::parse(&mut bits)?;
 				assert_eq!(bits.unread_bytes(), 0);
@@ -94,7 +105,10 @@ impl Frame {
 			FrameKind::Stop => FramePayload::Stop,
 			FrameKind::StringTables => {
 				let len = input.read_u32::<LittleEndian>()?;
-				let mut bits = BitReader::new(input, len as usize)?;
+				let mut buf = vec![0; len as usize];
+				input.read_exact(&mut buf);
+
+				let mut bits = BitReader::new(&buf);
 
 				let tables = StringTables::parse(&mut bits)?;
 				assert_eq!(bits.unread_bytes(), 0);
@@ -113,7 +127,7 @@ pub enum FramePayload {
 	Update(Update),
 	TickSync,
 	ConsoleCommand(String),
-	UserCmdDelta(UserCmdDelta),
+	UserCmdDelta { sequence: u32, delta: UserCmdDelta },
 	DataTables(DataTables),
 	Stop,
 	StringTables(StringTables)
@@ -122,14 +136,14 @@ pub enum FramePayload {
 impl FramePayload {
 	pub fn kind(&self) -> FrameKind {
 		match self {
-			&FramePayload::SignonUpdate(_)   => FrameKind::SignonUpdate,
-			&FramePayload::Update(_)         => FrameKind::Update,
-			&FramePayload::TickSync          => FrameKind::TickSync,
-			&FramePayload::ConsoleCommand(_) => FrameKind::ConsoleCommand,
-			&FramePayload::UserCmdDelta(_)   => FrameKind::UserCmdDelta,
-			&FramePayload::DataTables(_)     => FrameKind::DataTables,
-			&FramePayload::Stop              => FrameKind::Stop,
-			&FramePayload::StringTables(_)   => FrameKind::StringTables,
+			&FramePayload::SignonUpdate(_)     => FrameKind::SignonUpdate,
+			&FramePayload::Update(_)           => FrameKind::Update,
+			&FramePayload::TickSync            => FrameKind::TickSync,
+			&FramePayload::ConsoleCommand(_)   => FrameKind::ConsoleCommand,
+			&FramePayload::UserCmdDelta { .. } => FrameKind::UserCmdDelta,
+			&FramePayload::DataTables(_)       => FrameKind::DataTables,
+			&FramePayload::Stop                => FrameKind::Stop,
+			&FramePayload::StringTables(_)     => FrameKind::StringTables,
 		}
 	}
 }
@@ -149,11 +163,8 @@ impl Update {
 		let sequence_out = input.read_u32::<LittleEndian>()?;
 
 		let len = input.read_u32::<LittleEndian>()?;
-
-		let mut packets = Vec::with_capacity(len as usize);
-		for _ in 0..len {
-			packets.push(input.read_u8()?);
-		}
+		let mut packets = vec![0; len as usize];
+		input.read_exact(&mut packets);
 
 		Ok(Update { position, sequence_in, sequence_out, packets })
 	}

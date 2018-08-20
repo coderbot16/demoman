@@ -10,7 +10,7 @@ pub struct DataTables {
 }
 
 impl DataTables {
-	pub fn parse<R>(bits: &mut BitReader<R>) -> Result<Self, ParseError> where R: Read {
+	pub fn parse(bits: &mut BitReader) -> Result<Self, ParseError> {
 		let mut tables = Vec::new();
 
 		while bits.read_bit()? {
@@ -35,7 +35,7 @@ pub struct ClassLink {
 }
 
 impl ClassLink {
-	pub fn parse<R>(bits: &mut BitReader<R>) -> Result<Self, ParseError> where R: Read {
+	pub fn parse(bits: &mut BitReader) -> Result<Self, ParseError> {
 		let index = bits.read_u16()?;
 		let name = bits.read_string()?;
 		let table = bits.read_string()?;
@@ -52,7 +52,7 @@ pub struct DataTable {
 }
 
 impl DataTable {
-	pub fn parse<R>(bits: &mut BitReader<R>) -> Result<Self, ParseError> where R: Read {
+	pub fn parse(bits: &mut BitReader) -> Result<Self, ParseError> {
 		let needs_decoder = bits.read_bit()?;
 		let name = bits.read_string()?;
 		let entries = bits.read_bits(10)?;
@@ -79,7 +79,7 @@ pub struct Row {
 }
 
 impl Row {
-	pub fn parse<R>(bits: &mut BitReader<R>) -> Result<Self, ParseError> where R: Read {
+	pub fn parse(bits: &mut BitReader) -> Result<Self, ParseError> {
 		let kind_id = bits.read_bits(5)?;
 		let kind = RowKind::from_id(kind_id).ok_or(ParseError::BadEnumIndex { name: "data_table::RowKind", value: kind_id})?;
 

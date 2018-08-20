@@ -2,34 +2,32 @@ use std::io::{self, Read, Cursor};
 use byteorder::{ReadBytesExt, LittleEndian};
 use demo::parse::{ParseError, Needed};
 
-pub struct BitReader<R> where R: Read {
-	input: R,
-	remaining_bytes: usize,
+pub struct BitReader<'i> {
+	input: &'i [u8],
 	bits: u32,
 	/// Available bits. Must always be above 0.
 	available: u8
 }
 
-impl<R> BitReader<R> where R: Read {
-	pub fn new(input: R, max_bytes: usize) -> io::Result<Self> {
+impl<'i> BitReader<'i> {
+	pub fn new(input: &'i [u8]) -> Self {
 		let mut reader = BitReader {
 			input,
-			remaining_bytes: max_bytes,
 			bits: 0,
 			available: 0
 		};
 
-		reader.fetch()?;
+		reader.fetch();
 
-		Ok(reader)
+		reader
 	}
 
 	pub fn unread_bytes(&self) -> usize {
-		self.remaining_bytes
+		self.input.len()
 	}
 
 	pub fn has_remaining(&self, needed: usize) -> bool {
-		if self.remaining_bytes >= usize::max_value() / 8 {
+		if self.unread_bytes() >= usize::max_value() / 8 {
 			true
 		} else {
 			needed <= self.remaining_bits()
@@ -37,55 +35,53 @@ impl<R> BitReader<R> where R: Read {
 	}
 
 	pub fn has_remaining_bytes(&self, needed: usize) -> bool {
-		self.remaining_bytes.saturating_add((self.available / 8) as usize) >= needed
+		self.unread_bytes().saturating_add((self.available / 8) as usize) >= needed
 	}
 
 	pub fn remaining_bits(&self) -> usize {
-		self.remaining_bytes * 8 + (self.available as usize)
+		self.unread_bytes() * 8 + (self.available as usize)
 	}
 
 	pub fn remaining_bytes(&self) -> usize {
-		self.remaining_bytes + ((self.available / 8) as usize)
+		self.unread_bytes() + ((self.available / 8) as usize)
 	}
 
 	pub fn available_now(&self) -> u8 {
 		self.available
 	}
 
-	fn fetch(&mut self) -> io::Result<bool> {
-		assert_eq!(self.available, 0);
+	fn fetch(&mut self) {
+		if self.available > 0 {
+			return;
+		}
 
-		match self.remaining_bytes {
-			0 => return Ok(false),
+		match self.input.len() {
+			0 => (),
 			1 => {
-				self.remaining_bytes = 0;
+				self.bits = self.input[0] as u32;
+				self.input = &[];
 
-				self.bits = self.input.read_u8()? as u32;
 				self.available = 8;
 			},
 			2 => {
-				self.remaining_bytes = 0;
+				self.bits = (self.input[0] as u32) | ((self.input[1] as u32) << 8);
+				self.input = &[];
 
-				self.bits = self.input.read_u16::<LittleEndian>()? as u32;
 				self.available = 16;
 			},
 			3 => {
-				self.remaining_bytes = 0;
-
-				self.bits = self.input.read_u16::<LittleEndian>()? as u32;
-				self.bits |= (self.input.read_u8()? as u32) << 16;
+				self.bits = (self.input[0] as u32) | ((self.input[1] as u32) << 8) | ((self.input[2] as u32) << 16);
+				self.input = &[];
 
 				self.available = 24;
 			},
 			_ => {
-				self.remaining_bytes -= 4;
+				self.bits = (self.input[0] as u32) | ((self.input[1] as u32) << 8) | ((self.input[2] as u32) << 16) | ((self.input[2] as u32) << 32);
+				self.input = &self.input[4..];
 
-				self.bits = self.input.read_u32::<LittleEndian>()? as u32;
 				self.available = 32;
 			}
-		};
-
-		Ok(true)
+		}
 	}
 
 	pub fn read_bit(&mut self) -> Result<bool, ParseError> {
@@ -98,14 +94,12 @@ impl<R> BitReader<R> where R: Read {
 		self.available -= 1;
 		self.bits >>= 1;
 
-		if self.available == 0 {
-			self.fetch().map_err(ParseError::Io)?;
-		}
+		self.fetch();
 
 		Ok(bit)
 	}
 
-	fn read_bits_direct(&mut self, count: u8) -> io::Result<u32> {
+	fn read_bits_direct(&mut self, count: u8) -> u32 {
 		assert!(count > 0);
 		assert!(count <= self.available);
 
@@ -123,11 +117,9 @@ impl<R> BitReader<R> where R: Read {
 			bits
 		};
 
-		if self.available == 0 {
-			self.fetch()?;
-		}
+		self.fetch();
 
-		Ok(bits)
+		bits
 	}
 
 	pub fn read_bits(&mut self, count: u8) -> Result<u32, ParseError> {
@@ -138,18 +130,18 @@ impl<R> BitReader<R> where R: Read {
 		assert!(count <= 32, "cannot read more than 32 bits from a BitReader at a time.");
 
 		if count <= self.available {
-			self.read_bits_direct(count).map_err(ParseError::Io)
+			Ok(self.read_bits_direct(count))
 		} else {
 			let taken = self.available;
 			let needed = count - taken;
 
-			if self.remaining_bytes < 4 && (self.remaining_bytes as u8) * 8 < needed {
-				return Err(ParseError::Needed(Needed::Bits { requested: count as usize, available: taken as usize + self.remaining_bytes * 8 }));
+			if self.unread_bytes() < 4 && (self.unread_bytes() as u8) * 8 < needed {
+				return Err(ParseError::Needed(Needed::Bits { requested: count as usize, available: taken as usize + self.unread_bytes() * 8 }));
 			}
 
 			let parts = (
-				self.read_bits_direct(taken ).map_err(ParseError::Io)?,
-				self.read_bits_direct(needed).map_err(ParseError::Io)?
+				self.read_bits_direct(taken ),
+				self.read_bits_direct(needed)
 			);
 
 			Ok(parts.0 | (parts.1 << taken))
@@ -170,7 +162,7 @@ impl<R> BitReader<R> where R: Read {
 
 	pub fn read_u8_array_into(&mut self, data: &mut Vec<u8>, len: usize) -> Result<(), ParseError> {
 		if !self.has_remaining_bytes(len) {
-			return Err(ParseError::Needed(Needed::Bytes { requested: len, available: self.remaining_bytes }));
+			return Err(ParseError::Needed(Needed::Bytes { requested: len, available: self.remaining_bytes() }));
 		}
 
 		for _ in 0..len {
@@ -292,7 +284,7 @@ impl<R> BitReader<R> where R: Read {
 		Ok(result)
 	}
 
-	pub fn end(self) -> (R, u8) {
+	pub fn end(self) -> (&'i [u8], u8) {
 		(self.input, self.available)
 	}
 }
@@ -308,7 +300,7 @@ impl Bits {
 		Bits { data, trailing_bits: 0 }
 	}
 
-	pub fn copy_into<R>(bits: &mut BitReader<R>, count: usize) -> Result<Self, ParseError> where R: Read {
+	pub fn copy_into(bits: &mut BitReader, count: usize) -> Result<Self, ParseError> {
 		if !bits.has_remaining(count) {
 			return Err(ParseError::Needed(Needed::Bits { requested: count, available: bits.remaining_bits() }));
 		}
@@ -326,11 +318,8 @@ impl Bits {
 		Ok(Bits { data, trailing_bits })
 	}
 
-	pub fn reader(&self) -> BitReader<Cursor<&Vec<u8>>> {
-		let len = self.data.len();
-		let cursor = Cursor::new(&self.data);
-
-		BitReader::new(cursor, len).expect("Reading from a Vec cannot throw an IO error!")
+	pub fn reader(&self) -> BitReader {
+		BitReader::new(&self.data)
 	}
 
 	pub fn bits_len(&self) -> usize {

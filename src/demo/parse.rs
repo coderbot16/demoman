@@ -38,5 +38,5 @@ impl From<io::Error> for ParseError {
 }
 
 pub trait Encode: Sized {
-	fn parse<R>(bits: &mut BitReader<R>) -> Result<Self, ParseError> where R: io::Read;
+	fn parse(bits: &mut BitReader) -> Result<Self, ParseError>;
 }

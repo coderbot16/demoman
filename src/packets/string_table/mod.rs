@@ -11,7 +11,7 @@ pub use self::create::NewStringTable;
 pub struct StringTables(pub Vec<(String, StringTablePair)>);
 
 impl StringTables {
-	pub fn parse<R>(bits: &mut BitReader<R>) -> Result<Self, ParseError> where R: Read {
+	pub fn parse(bits: &mut BitReader) -> Result<Self, ParseError> {
 		let count = bits.read_u8()?;
 		let mut tables = Vec::with_capacity(count as usize);
 		
@@ -36,7 +36,7 @@ pub struct StringTablePair {
 }
 
 impl StringTablePair {
-	pub fn parse<R>(bits: &mut BitReader<R>) -> Result<Self, ParseError> where R: Read{
+	pub fn parse(bits: &mut BitReader) -> Result<Self, ParseError>{
 		Ok(StringTablePair {
 			primary: StringTable::parse(bits)?,
 			client: if bits.read_bit()? { Some(StringTable::parse(bits)?) } else { None }
@@ -83,7 +83,7 @@ impl StringTable {
 		self.capacity
 	}
 
-	pub fn parse<R>(bits: &mut BitReader<R>) -> Result<Self, ParseError> where R: Read {
+	pub fn parse(bits: &mut BitReader) -> Result<Self, ParseError> {
 		let count = bits.read_u16()?;
 		let mut strings = Vec::with_capacity(usize::from(count));
 
@@ -108,7 +108,7 @@ impl StringTable {
 		})
 	}
 
-	pub fn update<R>(&mut self, bits: &mut BitReader<R>, updated: u16) -> Result<(), ParseError> where R: Read {
+	pub fn update(&mut self, bits: &mut BitReader, updated: u16) -> Result<(), ParseError> {
 		let index_bits = (16 - (self.capacity.unwrap() as u16).leading_zeros()) as u8 - 1;
 
 		let mut tracker = StateTracker::new();

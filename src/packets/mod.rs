@@ -175,7 +175,7 @@ impl Packet {
 		}
 	}
 
-	pub fn parse_with_kind<R>(bits: &mut BitReader<R>, kind: PacketKind) -> Result<Self, ParseError> where R: Read {
+	pub fn parse_with_kind(bits: &mut BitReader, kind: PacketKind) -> Result<Self, ParseError> {
 		Ok(match kind {
 			PacketKind::Nop               => Packet::Nop,
 			PacketKind::Disconnect        => unimplemented!(),
@@ -222,7 +222,7 @@ pub struct TransferFile {
 }
 
 impl TransferFile {
-	pub fn parse<R>(bits: &mut BitReader<R>) -> Result<Self, ParseError> where R: Read {
+	pub fn parse(bits: &mut BitReader) -> Result<Self, ParseError> {
 		Ok(TransferFile {
 			transfer_id: bits.read_u32()?,
 			name: bits.read_string()?,
@@ -242,7 +242,7 @@ pub struct Tick {
 }
 
 impl Tick {
-	pub fn parse<R>(bits: &mut BitReader<R>) -> Result<Self, ParseError> where R: Read {
+	pub fn parse(bits: &mut BitReader) -> Result<Self, ParseError> {
 		Ok(Tick {
 			number: bits.read_u32()?,
 			fixed_time: bits.read_u16()?,
@@ -255,7 +255,7 @@ impl Tick {
 pub struct SetCvars(pub Vec<(String, String)>);
 
 impl SetCvars {
-	pub fn parse<R>(bits: &mut BitReader<R>) -> Result<Self, ParseError> where R: Read {
+	pub fn parse(bits: &mut BitReader) -> Result<Self, ParseError> {
 		let count = bits.read_u8()?;
 		let mut cvars = Vec::new();
 
@@ -302,7 +302,7 @@ pub struct SignonState {
 }
 
 impl SignonState {
-	pub fn parse<R>(bits: &mut BitReader<R>) -> Result<Self, ParseError> where R: Read {
+	pub fn parse(bits: &mut BitReader) -> Result<Self, ParseError> {
 		Ok(SignonState {
 			state: SignonStateKind::from_id(bits.read_u8()?),
 			server_count: bits.read_u32()?
@@ -347,7 +347,7 @@ pub struct ServerInfo {
 }
 
 impl ServerInfo {
-	pub fn parse<R>(bits: &mut BitReader<R>) -> Result<Self, ParseError> where R: Read {
+	pub fn parse(bits: &mut BitReader) -> Result<Self, ParseError> {
 		Ok(ServerInfo {
 			network_protocol: bits.read_u16()?,
 			server_count: bits.read_u32()?,
@@ -383,7 +383,7 @@ pub struct ClassInfo {
 }
 
 impl ClassInfo {
-	pub fn parse<R>(bits: &mut BitReader<R>) -> Result<Self, ParseError> where R: Read {
+	pub fn parse(bits: &mut BitReader) -> Result<Self, ParseError> {
 		let classes = bits.read_u16()?;
 		let no_parse = bits.read_bit()?;
 
@@ -409,7 +409,7 @@ pub struct CreateStringTable {
 }
 
 impl CreateStringTable {
-	pub fn parse<R>(bits: &mut BitReader<R>) -> Result<Self, ParseError> where R: Read {
+	pub fn parse(bits: &mut BitReader) -> Result<Self, ParseError> {
 		let name = bits.read_string()?;
 		let max_entries = bits.read_u16()?;
 
@@ -444,7 +444,7 @@ pub struct UpdateStringTable {
 }
 
 impl UpdateStringTable {
-	pub fn parse<R>(bits: &mut BitReader<R>) -> Result<Self, ParseError> where R: Read {
+	pub fn parse(bits: &mut BitReader) -> Result<Self, ParseError> {
 		Ok(UpdateStringTable {
 			table_id: bits.read_bits(5)? as u8,
 			entries: if bits.read_bit()? { bits.read_u16()? } else { 1 },
@@ -464,7 +464,7 @@ pub struct VoiceInit {
 }
 
 impl VoiceInit {
-	pub fn parse<R>(bits: &mut BitReader<R>) -> Result<Self, ParseError> where R: Read {
+	pub fn parse(bits: &mut BitReader) -> Result<Self, ParseError> {
 		Ok(VoiceInit {
 			codec:   bits.read_string()?,
 			quality: bits.read_u8()?,
@@ -481,7 +481,7 @@ pub struct VoiceData {
 }
 
 impl VoiceData {
-	pub fn parse<R>(bits: &mut BitReader<R>) -> Result<Self, ParseError> where R: Read {
+	pub fn parse(bits: &mut BitReader) -> Result<Self, ParseError> {
 		Ok(VoiceData {
 			sender: bits.read_u8()?,
 			proximity: bits.read_u8()?,
@@ -501,7 +501,7 @@ pub enum PlaySound {
 }
 
 impl PlaySound {
-	pub fn parse<R>(bits: &mut BitReader<R>) -> Result<Self, ParseError> where R: Read {
+	pub fn parse(bits: &mut BitReader) -> Result<Self, ParseError> {
 		let reliable = bits.read_bit()?;
 
 		Ok(if reliable {
@@ -524,7 +524,7 @@ pub struct FixAngle {
 }
 
 impl FixAngle {
-	pub fn parse<R>(bits: &mut BitReader<R>) -> Result<Self, ParseError> where R: Read {
+	pub fn parse(bits: &mut BitReader) -> Result<Self, ParseError> {
 		Ok(FixAngle {
 			relative: bits.read_bit()?,
 			angles: (
@@ -542,7 +542,7 @@ pub struct CrosshairAngle {
 }
 
 impl CrosshairAngle {
-	pub fn parse<R>(bits: &mut BitReader<R>) -> Result<Self, ParseError> where R: Read {
+	pub fn parse(bits: &mut BitReader) -> Result<Self, ParseError> {
 		Ok(CrosshairAngle {
 			angles: (
 				bits.read_u16()?,
@@ -563,7 +563,7 @@ pub struct Decal {
 }
 
 impl Decal {
-	pub fn parse<R>(bits: &mut BitReader<R>) -> Result<Self, ParseError> where R: Read {
+	pub fn parse(bits: &mut BitReader) -> Result<Self, ParseError> {
 		let position = bits.read_vec3()?;
 		let decal_index = bits.read_bits(9)? as u16;
 
@@ -586,7 +586,7 @@ pub struct UserMessage {
 }
 
 impl UserMessage {
-	pub fn parse<R>(bits: &mut BitReader<R>) -> Result<Self, ParseError> where R: Read {
+	pub fn parse(bits: &mut BitReader) -> Result<Self, ParseError> {
 		Ok(UserMessage {
 			channel: bits.read_u8()?,
 			data: {
@@ -605,7 +605,7 @@ pub struct EntityMessage {
 }
 
 impl EntityMessage {
-	pub fn parse<R>(bits: &mut BitReader<R>) -> Result<Self, ParseError> where R: Read {
+	pub fn parse(bits: &mut BitReader) -> Result<Self, ParseError> {
 		Ok(EntityMessage {
 			entity: bits.read_bits(11)? as u16,
 			class:  bits.read_bits(9)? as u16,
@@ -622,7 +622,7 @@ impl EntityMessage {
 pub struct GameEvent(pub Bits);
 
 impl GameEvent {
-	pub fn parse<R>(bits: &mut BitReader<R>) -> Result<Self, ParseError> where R: Read {
+	pub fn parse(bits: &mut BitReader) -> Result<Self, ParseError> {
 		let bits_len = bits.read_bits(11)? as usize;
 
 		Ok(GameEvent(Bits::copy_into(bits, bits_len)?))
@@ -640,7 +640,7 @@ pub struct Entities {
 }
 
 impl Entities {
-	pub fn parse<R>(bits: &mut BitReader<R>) -> Result<Self, ParseError> where R: Read {
+	pub fn parse(bits: &mut BitReader) -> Result<Self, ParseError> {
 		let max_entries = bits.read_bits(11)? as u16;
 
 		let delta_from_tick = if bits.read_bit()? {
@@ -671,7 +671,7 @@ pub struct TempEntities {
 }
 
 impl TempEntities {
-	pub fn parse<R>(bits: &mut BitReader<R>) -> Result<Self, ParseError> where R: Read {
+	pub fn parse(bits: &mut BitReader) -> Result<Self, ParseError> {
 		let count = bits.read_u8()?;
 		let bits_len = if USE_VAR_U32 { bits.read_var_u32()? } else {bits.read_bits(17)? };
 
@@ -690,7 +690,7 @@ pub struct Prefetch {
 }
 
 impl Prefetch {
-	pub fn parse<R>(bits: &mut BitReader<R>) -> Result<Self, ParseError> where R: Read {
+	pub fn parse(bits: &mut BitReader) -> Result<Self, ParseError> {
 		Ok(Prefetch {
 			unknown: if PREFETCH_HAS_TYPE_IDENTIFIER { bits.read_bit()? } else { false },
 			id:      bits.read_bits(13)? as u16
@@ -706,7 +706,7 @@ pub struct PluginMenu {
 }
 
 impl PluginMenu {
-	pub fn parse<R>(bits: &mut BitReader<R>) -> Result<Self, ParseError> where R: Read {
+	pub fn parse(bits: &mut BitReader) -> Result<Self, ParseError> {
 		Ok(PluginMenu {
 			kind: bits.read_u16()?,
 			data: {

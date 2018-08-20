@@ -47,7 +47,7 @@ impl SoundDelta {
 		}
 	}
 
-	pub fn parse<R>(bits: &mut BitReader<R>) -> Result<Self, ParseError> where R: Read {
+	pub fn parse(bits: &mut BitReader) -> Result<Self, ParseError> {
 		Ok(SoundDelta {
 			entity: if bits.read_bit()? {
 				Some(bits.read_bits(11)? as u16)
@@ -119,7 +119,7 @@ pub enum SequenceUpdate {
 }
 
 impl SequenceUpdate {
-	pub fn parse<R>(bits: &mut BitReader<R>) -> Result<Self, ParseError> where R: Read {
+	pub fn parse(bits: &mut BitReader) -> Result<Self, ParseError> {
 		Ok(if bits.read_bit()? {
 			SequenceUpdate::Unchanged
 		} else {

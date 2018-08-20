@@ -4,19 +4,15 @@ extern crate byteorder;
 extern crate snap;
 
 use dem::demo::header::{self, DemoHeader};
-use dem::demo::bits::{BitReader, Bits};
-use dem::demo::usercmd::{UserCmdDelta, PositionUpdate};
-use dem::demo::data_table::DataTables;
+use dem::demo::bits::Bits;
 use dem::packets::{PacketKind, Packet, PlaySound, SetCvars, GameEvent};
 use dem::packets::game_events::{GameEventList, GameEventInfo, Kind};
-use dem::packets::string_table::{StringTables, NewStringTable, Extra};
+use dem::packets::string_table::Extra;
 use dem::demo::frame::{Frame, FramePayload};
-use dem::packets::string_table::StringTable;
 use dem::packets;
 
 use std::io::{BufReader, Read, Seek, SeekFrom};
 use std::fs::File;
-use byteorder::{ReadBytesExt, LittleEndian};
 
 //const PATH: &str = "/home/coderbot/Source/HowToMedicFortress_coderbot_1200_USA.dem";
 //const PATH: &str = "/home/coderbot/.steam/steam/steamapps/common/Team Fortress 2/tf/demos/2017-12-23_16-43-13.dem";
@@ -93,7 +89,7 @@ fn main() {
 			},
 			FramePayload::TickSync => println!("| Tick Sync"),
 			FramePayload::ConsoleCommand(command) => if SHOW_COMMANDS { println!("> {}", command) },
-			FramePayload::UserCmdDelta(delta) => /*println!("| UserCmdDelta (hidden)")*/(),
+			FramePayload::UserCmdDelta { sequence: _, delta: _ } => /*println!("| UserCmdDelta (hidden)")*/(),
 			FramePayload::DataTables(tables) => if SHOW_DATA_TABLES { println!("| Data Tables - {} tables, {} class links", tables.tables.len(), tables.links.len()) },
 			FramePayload::Stop => {
 				println!("| Stop");
@@ -193,7 +189,7 @@ impl Handler for ShowGameEvents {
 			Packet::GameEventList(GameEventList(event_list)) => {
 				println!("List of game events:");
 
-				for &GameEventInfo { index, ref name, ref properties } in &event_list {
+				for &GameEventInfo { index, ref name, properties: _ } in &event_list {
 					println!("Index: {}, Name: {}", index, name);
 				}
 

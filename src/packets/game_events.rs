@@ -6,7 +6,7 @@ use std::io::Read;
 pub struct GameEventList(pub Vec<GameEventInfo>);
 
 impl GameEventList {
-	pub fn parse<R>(bits: &mut BitReader<R>) -> Result<Self, ParseError> where R: Read {
+	pub fn parse(bits: &mut BitReader) -> Result<Self, ParseError> {
 		let count = bits.read_bits(9)?;
 		let bits_len = bits.read_bits(20)?;
 
@@ -59,7 +59,7 @@ pub struct GameEventInfo {
 }
 
 impl GameEventInfo {
-	pub fn parse<R>(bits: &mut BitReader<R>) -> Result<Self, ParseError> where R: Read {
+	pub fn parse(bits: &mut BitReader) -> Result<Self, ParseError> {
 		let index = bits.read_bits(9)? as u16;
 		let name = bits.read_string()?;
 		let mut properties = Vec::new();
