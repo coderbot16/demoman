@@ -79,9 +79,9 @@ impl NewStringTable {
 
 			let mut bits = BitReader::new(&uncompressed);
 
-			table.update(&mut bits, packet.entries);
+			table.update(&mut bits, packet.entries)?;
 		} else {
-			table.update(&mut bits, packet.entries);
+			table.update(&mut bits, packet.entries)?;
 		};
 
 		Ok(NewStringTable {

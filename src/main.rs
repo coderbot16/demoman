@@ -15,7 +15,8 @@ use std::io::{BufReader, Read, Seek, SeekFrom};
 use std::fs::File;
 
 //const PATH: &str = "/home/coderbot/Source/HowToMedicFortress_coderbot_1200_USA.dem";
-//const PATH: &str = "/home/coderbot/.steam/steam/steamapps/common/Team Fortress 2/tf/demos/2017-12-23_16-43-13.dem";
+//const PATH: &str = "/home/coderbot/.steam/steam/steamapps/common/Team Fortress 2/tf/demos/2018-06-14_17-43-32.dem";
+const PATH: &str = "/home/coderbot/.steam/steam/steamapps/common/Team Fortress 2/tf/demos/2017-12-23_16-43-13.dem";
 //const PATH: &str = "/home/coderbot/.steam/steam/steamapps/common/Team Fortress 2/tf/demos/2018-07-28_22-43-39.dem";
 //const PATH: &str = "/home/coderbot/.steam/steam/steamapps/common/Team Fortress 2/tf/demos/2018-08-11_21-53-34.dem";
 //const PATH: &str = "/home/coderbot/.steam/steam/steamapps/common/Team Fortress 2/tf/demos/2016-12-07_18-25-34.dem";
@@ -24,11 +25,11 @@ use std::fs::File;
 //const PATH: &str = "/home/coderbot/Source/TF2 Demo Test Data/2012-07-23-Steel.dem";
 //const PATH: &str = "/home/coderbot/Source/TF2 Demo Test Data/2012-06-29-Dustbowl.dem";
 //const PATH: &str = "/home/coderbot/Source/TF2 Demo Test Data/2010-04-07-Badlands.dem";
-const PATH: &str = "/home/coderbot/Source/TF2 Demo Test Data/2009-10-22-Granary.dem";
+//const PATH: &str = "/home/coderbot/Source/TF2 Demo Test Data/2009-10-22-Granary.dem";
 //const PATH: &str = "/home/coderbot/.steam/steam/steamapps/common/Half-Life 2/hl2/first.dem";
 
-//const MAX_PARSED_PACKETS: usize = 4096;
-const MAX_PARSED_PACKETS: usize = 4_000_000_000;
+const MAX_PARSED_PACKETS: usize = 4096;
+//const MAX_PARSED_PACKETS: usize = 4_000_000_000;
 const SHOW_STRING_TABLES: bool = false;
 const SHOW_DATA_TABLES: bool = false;
 const SHOW_STRING_TABLE_CONTENTS: bool = false;

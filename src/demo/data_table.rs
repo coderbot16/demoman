@@ -1,4 +1,3 @@
-use std::io::Read;
 use demo::bits::BitReader;
 use demo::parse::ParseError;
 use std::fmt::{self, Display, Formatter};

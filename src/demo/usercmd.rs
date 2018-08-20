@@ -1,5 +1,5 @@
 use byteorder::{LittleEndian, ReadBytesExt};
-use std::io::{self, Read, Cursor};
+use std::io::{self, Read};
 use demo::bits::BitReader;
 use demo::parse::ParseError;
 

@@ -1,6 +1,5 @@
 use demo::bits::BitReader;
 use demo::parse::ParseError;
-use std::io::Read;
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct Sound {

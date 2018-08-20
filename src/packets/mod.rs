@@ -3,9 +3,8 @@ pub mod string_table;
 
 use demo::bits::{BitReader, Bits};
 use demo::parse::ParseError;
-use std::io::Read;
 
-const USE_PROTOCOL: u32 = 15_0;
+const USE_PROTOCOL: u32 = 24_1;
 
 /// Version 23 and below use a fixed size bit length field instead of a variable size one in CreateStringTable and TempEntities.
 pub const USE_VAR_U32: bool = USE_PROTOCOL >= 24_0;

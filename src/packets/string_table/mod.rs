@@ -1,7 +1,6 @@
 use std::collections::VecDeque;
 use demo::bits::BitReader;
 use demo::parse::ParseError;
-use std::io::Read;
 
 mod create;
 

@@ -1,5 +1,3 @@
-use std::io::{self, Read, Cursor};
-use byteorder::{ReadBytesExt, LittleEndian};
 use demo::parse::{ParseError, Needed};
 
 pub struct BitReader<'i> {
@@ -76,7 +74,7 @@ impl<'i> BitReader<'i> {
 				self.available = 24;
 			},
 			_ => {
-				self.bits = (self.input[0] as u32) | ((self.input[1] as u32) << 8) | ((self.input[2] as u32) << 16) | ((self.input[2] as u32) << 32);
+				self.bits = (self.input[0] as u32) | ((self.input[1] as u32) << 8) | ((self.input[2] as u32) << 16) | ((self.input[3] as u32) << 24);
 				self.input = &self.input[4..];
 
 				self.available = 32;

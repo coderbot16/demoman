@@ -82,7 +82,7 @@ impl Frame {
 
 				let len = input.read_u32::<LittleEndian>()?;
 				let mut buf = vec![0; len as usize];
-				input.read_exact(&mut buf);
+				input.read_exact(&mut buf)?;
 
 				let mut bits = BitReader::new(&buf);
 
@@ -93,7 +93,7 @@ impl Frame {
 			FrameKind::DataTables => {
 				let len = input.read_u32::<LittleEndian>()?;
 				let mut buf = vec![0; len as usize];
-				input.read_exact(&mut buf);
+				input.read_exact(&mut buf)?;
 
 				let mut bits = BitReader::new(&buf);
 
@@ -106,7 +106,7 @@ impl Frame {
 			FrameKind::StringTables => {
 				let len = input.read_u32::<LittleEndian>()?;
 				let mut buf = vec![0; len as usize];
-				input.read_exact(&mut buf);
+				input.read_exact(&mut buf)?;
 
 				let mut bits = BitReader::new(&buf);
 
@@ -164,7 +164,7 @@ impl Update {
 
 		let len = input.read_u32::<LittleEndian>()?;
 		let mut packets = vec![0; len as usize];
-		input.read_exact(&mut packets);
+		input.read_exact(&mut packets)?;
 
 		Ok(Update { position, sequence_in, sequence_out, packets })
 	}
