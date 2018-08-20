@@ -112,6 +112,7 @@ impl StringTable {
 		let index_bits = (16 - (self.capacity.unwrap() as u16).leading_zeros()) as u8 - 1;
 
 		let mut tracker = StateTracker::new();
+		let max_index = (self.strings.len() - 1) as u32;
 
 		for _ in 0..updated {
 			let index = if bits.read_bit()? { None } else { Some(bits.read_bits(index_bits)?) };
@@ -141,7 +142,9 @@ impl StringTable {
 				string
 			};
 
-			let (index, string) = tracker.read(row).expect("TODO: Handle invalid history index condition");
+			let (index, string) = tracker.read(row).map_err(|invalid_index|
+				ParseError::OutOfBounds { name: "string_table::HistoryIndex", value: u32::from(invalid_index.index), min: 0, max: u32::from(invalid_index.len - 1)}
+			)?;
 
 			let extra = if bits.read_bit()? {
 				match self.fixed_extra_size {
@@ -171,7 +174,7 @@ impl StringTable {
 						row.1 = extra;
 					}
 				},
-				None => panic!("Invalid index in string table update!")
+				None => return Err(ParseError::OutOfBounds { name: "string_table::StringIndex", value: index, min: 0, max: max_index})
 			}
 		}
 

@@ -1,6 +1,7 @@
 use std::io;
 use std::string::FromUtf8Error;
 use demo::bits::BitReader;
+use std::borrow::Cow;
 
 #[derive(Debug)]
 pub enum Needed {
@@ -12,7 +13,10 @@ pub enum Needed {
 pub enum ParseError {
 	Needed(Needed),
 	Utf8(FromUtf8Error),
-	Io(io::Error)
+	Io(io::Error),
+	BadEnumIndex { name: &'static str, value: u32 },
+	OutOfBounds { name: &'static str, value: u32, min: u32, max: u32 },
+	Custom(Cow<'static, str>)
 }
 
 impl From<Needed> for ParseError {

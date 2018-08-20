@@ -387,7 +387,9 @@ impl ClassInfo {
 		let classes = bits.read_u16()?;
 		let no_parse = bits.read_bit()?;
 
-		assert!(no_parse, "Don't know how to parse the body of ClassInfo!");
+		if !no_parse {
+			unimplemented!("Don't know how to parse the body of ClassInfo!")
+		}
 
 		Ok(ClassInfo {
 			classes,
@@ -411,7 +413,9 @@ impl CreateStringTable {
 		let name = bits.read_string()?;
 		let max_entries = bits.read_u16()?;
 
-		assert_ne!(max_entries, 0);
+		if max_entries == 0 {
+			unimplemented!("Don't know how to handle a string table with a maximum of 0 entries")
+		}
 
 		let index_bits = (16 - max_entries.leading_zeros()) as u8 - 1;
 		let entries = bits.read_bits(index_bits + 1)? as u16;

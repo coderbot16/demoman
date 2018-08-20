@@ -30,7 +30,7 @@ impl UserCmdDelta {
 		let mut data = Vec::with_capacity(len as usize);
 
 		for _ in 0..len {
-			data.push(input.read_u8().unwrap());
+			data.push(input.read_u8()?);
 		}
 
 		let mut cursor = Cursor::new(&mut data);

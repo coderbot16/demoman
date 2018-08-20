@@ -77,7 +77,7 @@ fn main() {
 			println!();
 		}
 
-		let frame = Frame::parse(&mut file);
+		let frame = Frame::parse(&mut file).unwrap();
 
 		if SHOW_FRAME_HEADER_SPAM {
 			print!("T: {} ", frame.tick);
@@ -290,14 +290,6 @@ impl Handler for ShowGameEvents {
 				/*let values = ::dem::payload::game_events::GameEventData(values);
 
 				match game_event.name.as_ref() {
-					/*"player_hurt" => {
-						let attacker = if let &Value::I16(value) = values.get("attacker").unwrap() { value } else { panic!() };
-						let victim = if let &Value::I16(value) = values.get("userid").unwrap() { value } else { panic!() };
-						let damage = if let &Value::I16(value) = values.get("damageamount").unwrap() { value } else { panic!() };
-						let health = if let &Value::I16(value) = values.get("health").unwrap() { value } else { panic!() };
-
-						println!("{} hurt {} for {} damage, leaving them at {} health", attacker, victim, damage, health);
-					},*/
 					"player_hurt" => (),
 					"player_healed" => (),
 					"post_inventory_application" => (),
@@ -462,7 +454,9 @@ fn parse_update<H>(data: Vec<u8>, demo: &DemoHeader, handler: &mut H) where H: H
 	let data = Bits::from_bytes(data);
 	let mut bits = data.reader();
 
-	assert!(demo.network_protocol > 10, "Network protocols less than 10 do not have fixed_time and fixed_time_stdev in Tick, this is not handled yet!");
+	if demo.network_protocol < 10 {
+		unimplemented!("Network protocols less than 10 do not have fixed_time and fixed_time_stdev in Tick, this is not handled yet!");
+	}
 
 	while bits.remaining_bits() >= packets::PACKET_KIND_BITS as usize {
 		let id = bits.read_bits(packets::PACKET_KIND_BITS).unwrap();

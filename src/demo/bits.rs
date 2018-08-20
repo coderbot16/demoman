@@ -330,7 +330,7 @@ impl Bits {
 		let len = self.data.len();
 		let cursor = Cursor::new(&self.data);
 
-		BitReader::new(cursor, len).unwrap()
+		BitReader::new(cursor, len).expect("Reading from a Vec cannot throw an IO error!")
 	}
 
 	pub fn bits_len(&self) -> usize {

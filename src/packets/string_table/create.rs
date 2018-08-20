@@ -42,13 +42,15 @@ impl NewStringTable {
 			let uncompressed_size = bits.read_u32()?;
 			let compressed_size = bits.read_u32()?;
 
-			assert!(compressed_size > 4);
+			if compressed_size < 4 {
+				return Err(ParseError::Custom("string table compressed size is too small, must be at least 4 to contain compression magic".into()));
+			}
 
 			let compressed_size = compressed_size - 4;
 
 			let compression = match CompressionType::from_id(bits.read_u32()?.swap_bytes()) {
 				Ok(compression) => compression,
-				Err(id) => panic!("Unexpected String Table compression magic: expected 0x534E4150 ('SNAP') or 0x4C5A5353 ('LZSS'), got 0x{:08X}", id)
+				Err(id) => return Err(ParseError::BadEnumIndex { name: "string_table::CompressionType", value: id })
 			};
 
 			let compressed = bits.read_u8_array(compressed_size as usize)?;

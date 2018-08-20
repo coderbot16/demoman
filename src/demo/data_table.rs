@@ -80,7 +80,8 @@ pub struct Row {
 
 impl Row {
 	pub fn parse<R>(bits: &mut BitReader<R>) -> Result<Self, ParseError> where R: Read {
-		let kind = RowKind::from_id(bits.read_bits(5)?).unwrap();
+		let kind_id = bits.read_bits(5)?;
+		let kind = RowKind::from_id(kind_id).ok_or(ParseError::BadEnumIndex { name: "data_table::RowKind", value: kind_id})?;
 
 		let name = bits.read_string()?;
 		let flags = Flags(bits.read_u16()?);
