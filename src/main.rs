@@ -5,18 +5,17 @@ extern crate snap;
 
 use dem::demo::header::{self, DemoHeader};
 use dem::demo::bits::Bits;
-use dem::packets::{PacketKind, Packet, PlaySound, SetCvars, GameEvent};
+use dem::packets::{ProtocolVersion, PacketKind, Packet, PlaySound, SetCvars, GameEvent};
 use dem::packets::game_events::{GameEventList, GameEventInfo, Kind};
 use dem::packets::string_table::Extra;
 use dem::demo::frame::{Frame, FramePayload};
-use dem::packets;
 
 use std::io::{BufReader, Read, Seek, SeekFrom};
 use std::fs::File;
 
-//const PATH: &str = "/home/coderbot/Source/HowToMedicFortress_coderbot_1200_USA.dem";
+const PATH: &str = "/home/coderbot/Source/HowToMedicFortress_coderbot_1200_USA.dem";
 //const PATH: &str = "/home/coderbot/.steam/steam/steamapps/common/Team Fortress 2/tf/demos/2018-06-14_17-43-32.dem";
-const PATH: &str = "/home/coderbot/.steam/steam/steamapps/common/Team Fortress 2/tf/demos/2017-12-23_16-43-13.dem";
+//const PATH: &str = "/home/coderbot/.steam/steam/steamapps/common/Team Fortress 2/tf/demos/2017-12-23_16-43-13.dem";
 //const PATH: &str = "/home/coderbot/.steam/steam/steamapps/common/Team Fortress 2/tf/demos/2018-07-28_22-43-39.dem";
 //const PATH: &str = "/home/coderbot/.steam/steam/steamapps/common/Team Fortress 2/tf/demos/2018-08-11_21-53-34.dem";
 //const PATH: &str = "/home/coderbot/.steam/steam/steamapps/common/Team Fortress 2/tf/demos/2016-12-07_18-25-34.dem";
@@ -161,6 +160,7 @@ impl Handler for DumpVoiceData {
 				println!("{:?}", packet)
 			},
 			Packet::VoiceData(packet) => {
+				//println!("{}", packet.data.raw_bytes().len());
 				print!("[Sender: {}, Proximity: {}, Bytes: {}] ", packet.sender, packet.proximity, packet.data.raw_bytes().len());
 
 				if packet.data.bits_len() == 0 {
@@ -455,11 +455,13 @@ fn parse_update<H>(data: Vec<u8>, demo: &DemoHeader, handler: &mut H) where H: H
 		unimplemented!("Network protocols less than 10 do not have fixed_time and fixed_time_stdev in Tick, this is not handled yet!");
 	}
 
-	while bits.remaining_bits() >= packets::PACKET_KIND_BITS as usize {
-		let id = bits.read_bits(packets::PACKET_KIND_BITS).unwrap();
+	let version = ProtocolVersion(demo.network_protocol as u32);
+
+	while bits.has_remaining(version.packet_kind_bits() as usize) {
+		let id = bits.read_bits(version.packet_kind_bits()).unwrap();
 
 		let kind = PacketKind::from_id(id as u8).expect("Packet ID cannot be greater than 31");
 
-		handler.packet(Packet::parse_with_kind(&mut bits, kind).unwrap());
+		handler.packet(Packet::parse_with_kind(&mut bits, kind, version).unwrap());
 	}
 }

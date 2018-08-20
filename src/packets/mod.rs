@@ -4,26 +4,17 @@ pub mod string_table;
 use demo::bits::{BitReader, Bits};
 use demo::parse::ParseError;
 
-const USE_PROTOCOL: u32 = 24_1;
-
-/// Version 23 and below use a fixed size bit length field instead of a variable size one in CreateStringTable and TempEntities.
-pub const USE_VAR_U32: bool = USE_PROTOCOL >= 24_0;
-
-/// Protocol version 22 and below lack a type identifier on the Prefetch packet.
-/// However, all modern versions have this type identifier.
-pub const PREFETCH_HAS_TYPE_IDENTIFIER: bool = USE_PROTOCOL >= 23_0;
-
-/// This was changed within version 24, which potentially breaks backwards compatibility.
-pub const VOICEINIT_HAS_EXTRA_FIELD: bool = USE_PROTOCOL >= 24_1;
-
-// TODO: 12 in older versions! Appears to be related to the size of the `modelprecache` string table.
-// The version test here is very inaccurate.
-pub const MODEL_INDEX_BITS: u8 = 12 + (USE_PROTOCOL >= 24_0) as u8;
-
-// TODO: 16_0 is just a guess, I really don't know
-pub const PACKET_KIND_BITS: u8 = 5 + (USE_PROTOCOL >= 16_0) as u8;
-
 type EntityId = u16;
+
+#[derive(Copy, Clone, Eq, PartialEq, Debug)]
+pub struct ProtocolVersion(pub u32);
+
+impl ProtocolVersion {
+	pub fn packet_kind_bits(self) -> u8 {
+		// TODO: 16 is just a guess, I really don't know
+		5 + (self.0 >= 16) as u8
+	}
+}
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum PacketKind {
@@ -174,38 +165,38 @@ impl Packet {
 		}
 	}
 
-	pub fn parse_with_kind(bits: &mut BitReader, kind: PacketKind) -> Result<Self, ParseError> {
+	pub fn parse_with_kind(bits: &mut BitReader, kind: PacketKind, version: ProtocolVersion) -> Result<Self, ParseError> {
 		Ok(match kind {
 			PacketKind::Nop               => Packet::Nop,
 			PacketKind::Disconnect        => unimplemented!(),
-			PacketKind::TransferFile      => Packet::TransferFile     (TransferFile::parse(bits)?),
-			PacketKind::Tick              => Packet::Tick             (Tick::parse(bits)?),
+			PacketKind::TransferFile      => Packet::TransferFile     (TransferFile::parse(bits, version)?),
+			PacketKind::Tick              => Packet::Tick             (Tick::parse(bits, version)?),
 			PacketKind::StringCommand     => Packet::StringCommand    (bits.read_string()?),
-			PacketKind::SetCvars          => Packet::SetCvars         (SetCvars::parse(bits)?),
-			PacketKind::SignonState       => Packet::SignonState      (SignonState::parse(bits)?),
+			PacketKind::SetCvars          => Packet::SetCvars         (SetCvars::parse(bits, version)?),
+			PacketKind::SignonState       => Packet::SignonState      (SignonState::parse(bits, version)?),
 			PacketKind::Print             => Packet::Print            (bits.read_string()?),
-			PacketKind::ServerInfo        => Packet::ServerInfo       (ServerInfo::parse(bits)?),
+			PacketKind::ServerInfo        => Packet::ServerInfo       (ServerInfo::parse(bits, version)?),
 			PacketKind::DataTable         => unimplemented!(),
-			PacketKind::ClassInfo         => Packet::ClassInfo        (ClassInfo::parse(bits)?),
+			PacketKind::ClassInfo         => Packet::ClassInfo        (ClassInfo::parse(bits, version)?),
 			PacketKind::Pause             => Packet::Pause            (bits.read_bit()?),
-			PacketKind::CreateStringTable => Packet::CreateStringTable(CreateStringTable::parse(bits)?),
-			PacketKind::UpdateStringTable => Packet::UpdateStringTable(UpdateStringTable::parse(bits)?),
-			PacketKind::VoiceInit         => Packet::VoiceInit        (VoiceInit::parse(bits)?),
-			PacketKind::VoiceData         => Packet::VoiceData        (VoiceData::parse(bits)?),
+			PacketKind::CreateStringTable => Packet::CreateStringTable(CreateStringTable::parse(bits, version)?),
+			PacketKind::UpdateStringTable => Packet::UpdateStringTable(UpdateStringTable::parse(bits, version)?),
+			PacketKind::VoiceInit         => Packet::VoiceInit        (VoiceInit::parse(bits, version)?),
+			PacketKind::VoiceData         => Packet::VoiceData        (VoiceData::parse(bits, version)?),
 			PacketKind::HltvControl       => unimplemented!(),
-			PacketKind::PlaySound         => Packet::PlaySound        (PlaySound::parse(bits)?),
+			PacketKind::PlaySound         => Packet::PlaySound        (PlaySound::parse(bits, version)?),
 			PacketKind::SetEntityView     => Packet::SetEntityView    (bits.read_bits(11)? as u16),
-			PacketKind::FixAngle          => Packet::FixAngle         (FixAngle::parse(bits)?),
-			PacketKind::CrosshairAngle    => Packet::CrosshairAngle   (CrosshairAngle::parse(bits)?),
-			PacketKind::Decal             => Packet::Decal            (Decal::parse(bits)?),
+			PacketKind::FixAngle          => Packet::FixAngle         (FixAngle::parse(bits, version)?),
+			PacketKind::CrosshairAngle    => Packet::CrosshairAngle   (CrosshairAngle::parse(bits, version)?),
+			PacketKind::Decal             => Packet::Decal            (Decal::parse(bits, version)?),
 			PacketKind::TerrainMod        => unimplemented!(),
-			PacketKind::UserMessage       => Packet::UserMessage      (UserMessage::parse(bits)?),
-			PacketKind::EntityMessage     => Packet::EntityMessage    (EntityMessage::parse(bits)?),
-			PacketKind::GameEvent         => Packet::GameEvent        (GameEvent::parse(bits)?),
-			PacketKind::Entities          => Packet::Entities         (Entities::parse(bits)?),
-			PacketKind::TempEntities      => Packet::TempEntities     (TempEntities::parse(bits)?),
-			PacketKind::Prefetch          => Packet::Prefetch         (Prefetch::parse(bits)?),
-			PacketKind::PluginMenu        => Packet::PluginMenu       (PluginMenu::parse(bits)?),
+			PacketKind::UserMessage       => Packet::UserMessage      (UserMessage::parse(bits, version)?),
+			PacketKind::EntityMessage     => Packet::EntityMessage    (EntityMessage::parse(bits, version)?),
+			PacketKind::GameEvent         => Packet::GameEvent        (GameEvent::parse(bits, version)?),
+			PacketKind::Entities          => Packet::Entities         (Entities::parse(bits, version)?),
+			PacketKind::TempEntities      => Packet::TempEntities     (TempEntities::parse(bits, version)?),
+			PacketKind::Prefetch          => Packet::Prefetch         (Prefetch::parse(bits, version)?),
+			PacketKind::PluginMenu        => Packet::PluginMenu       (PluginMenu::parse(bits, version)?),
 			PacketKind::GameEventList     => Packet::GameEventList    (game_events::GameEventList::parse(bits)?),
 			PacketKind::GetCvar           => unimplemented!()
 		})
@@ -221,7 +212,7 @@ pub struct TransferFile {
 }
 
 impl TransferFile {
-	pub fn parse(bits: &mut BitReader) -> Result<Self, ParseError> {
+	pub fn parse(bits: &mut BitReader, _version: ProtocolVersion) -> Result<Self, ParseError> {
 		Ok(TransferFile {
 			transfer_id: bits.read_u32()?,
 			name: bits.read_string()?,
@@ -241,7 +232,7 @@ pub struct Tick {
 }
 
 impl Tick {
-	pub fn parse(bits: &mut BitReader) -> Result<Self, ParseError> {
+	pub fn parse(bits: &mut BitReader, _version: ProtocolVersion) -> Result<Self, ParseError> {
 		Ok(Tick {
 			number: bits.read_u32()?,
 			fixed_time: bits.read_u16()?,
@@ -254,7 +245,7 @@ impl Tick {
 pub struct SetCvars(pub Vec<(String, String)>);
 
 impl SetCvars {
-	pub fn parse(bits: &mut BitReader) -> Result<Self, ParseError> {
+	pub fn parse(bits: &mut BitReader, _version: ProtocolVersion) -> Result<Self, ParseError> {
 		let count = bits.read_u8()?;
 		let mut cvars = Vec::new();
 
@@ -301,7 +292,7 @@ pub struct SignonState {
 }
 
 impl SignonState {
-	pub fn parse(bits: &mut BitReader) -> Result<Self, ParseError> {
+	pub fn parse(bits: &mut BitReader, _version: ProtocolVersion) -> Result<Self, ParseError> {
 		Ok(SignonState {
 			state: SignonStateKind::from_id(bits.read_u8()?),
 			server_count: bits.read_u32()?
@@ -346,7 +337,7 @@ pub struct ServerInfo {
 }
 
 impl ServerInfo {
-	pub fn parse(bits: &mut BitReader) -> Result<Self, ParseError> {
+	pub fn parse(bits: &mut BitReader, version: ProtocolVersion) -> Result<Self, ParseError> {
 		Ok(ServerInfo {
 			network_protocol: bits.read_u16()?,
 			server_count: bits.read_u32()?,
@@ -354,7 +345,7 @@ impl ServerInfo {
 			dedicated: bits.read_bit()?,
 			client_dll_crc: bits.read_u32()?,
 			max_classes: bits.read_u16()?,
-			_unknown0: if USE_PROTOCOL >= 16_0 { Ok([
+			_unknown0: if version.0 >= 16 { Ok([
 				bits.read_u8()?, bits.read_u8()?, bits.read_u8()?, bits.read_u8()?,
 				bits.read_u8()?, bits.read_u8()?, bits.read_u8()?, bits.read_u8()?,
 				bits.read_u8()?, bits.read_u8()?, bits.read_u8()?, bits.read_u8()?,
@@ -370,7 +361,7 @@ impl ServerInfo {
 			map: bits.read_string()?,
 			sky: bits.read_string()?,
 			hostname: bits.read_string()?,
-			_unknown1: if USE_PROTOCOL >= 16_0 { bits.read_bit()? } else { false }
+			_unknown1: if version.0 >= 16 { bits.read_bit()? } else { false }
 		})
 	}
 }
@@ -382,7 +373,7 @@ pub struct ClassInfo {
 }
 
 impl ClassInfo {
-	pub fn parse(bits: &mut BitReader) -> Result<Self, ParseError> {
+	pub fn parse(bits: &mut BitReader, _version: ProtocolVersion) -> Result<Self, ParseError> {
 		let classes = bits.read_u16()?;
 		let no_parse = bits.read_bit()?;
 
@@ -408,7 +399,7 @@ pub struct CreateStringTable {
 }
 
 impl CreateStringTable {
-	pub fn parse(bits: &mut BitReader) -> Result<Self, ParseError> {
+	pub fn parse(bits: &mut BitReader, version: ProtocolVersion) -> Result<Self, ParseError> {
 		let name = bits.read_string()?;
 		let max_entries = bits.read_u16()?;
 
@@ -418,7 +409,7 @@ impl CreateStringTable {
 
 		let index_bits = (16 - max_entries.leading_zeros()) as u8 - 1;
 		let entries = bits.read_bits(index_bits + 1)? as u16;
-		let bits_len = if USE_VAR_U32 { bits.read_var_u32()? } else { bits.read_bits(20)? };
+		let bits_len = if version.0 >= 24 { bits.read_var_u32()? } else { bits.read_bits(20)? };
 
 		// Size and Bits Size
 		let fixed_userdata_size = if bits.read_bit()?  {
@@ -443,7 +434,7 @@ pub struct UpdateStringTable {
 }
 
 impl UpdateStringTable {
-	pub fn parse(bits: &mut BitReader) -> Result<Self, ParseError> {
+	pub fn parse(bits: &mut BitReader, _version: ProtocolVersion) -> Result<Self, ParseError> {
 		Ok(UpdateStringTable {
 			table_id: bits.read_bits(5)? as u8,
 			entries: if bits.read_bit()? { bits.read_u16()? } else { 1 },
@@ -458,18 +449,25 @@ impl UpdateStringTable {
 #[derive(Debug, Clone)]
 pub struct VoiceInit {
 	pub codec: String,
-	pub quality: u8,
-	pub unknown: Option<u16>
+	pub settings: VoiceSettings
 }
 
 impl VoiceInit {
-	pub fn parse(bits: &mut BitReader) -> Result<Self, ParseError> {
+	pub fn parse(bits: &mut BitReader, _version: ProtocolVersion) -> Result<Self, ParseError> {
 		Ok(VoiceInit {
 			codec:   bits.read_string()?,
-			quality: bits.read_u8()?,
-			unknown: if VOICEINIT_HAS_EXTRA_FIELD { Some(bits.read_u16()?) } else { None }
+			settings: match bits.read_u8()? {
+				255     => VoiceSettings::Extra  (bits.read_u16()?),
+				quality => VoiceSettings::Quality(quality)
+			}
 		})
 	}
+}
+
+#[derive(Debug, Clone)]
+pub enum VoiceSettings {
+	Quality(u8),
+	Extra(u16)
 }
 
 #[derive(Debug, Clone)]
@@ -480,7 +478,7 @@ pub struct VoiceData {
 }
 
 impl VoiceData {
-	pub fn parse(bits: &mut BitReader) -> Result<Self, ParseError> {
+	pub fn parse(bits: &mut BitReader, _version: ProtocolVersion) -> Result<Self, ParseError> {
 		Ok(VoiceData {
 			sender: bits.read_u8()?,
 			proximity: bits.read_u8()?,
@@ -500,7 +498,7 @@ pub enum PlaySound {
 }
 
 impl PlaySound {
-	pub fn parse(bits: &mut BitReader) -> Result<Self, ParseError> {
+	pub fn parse(bits: &mut BitReader, _version: ProtocolVersion) -> Result<Self, ParseError> {
 		let reliable = bits.read_bit()?;
 
 		Ok(if reliable {
@@ -523,7 +521,7 @@ pub struct FixAngle {
 }
 
 impl FixAngle {
-	pub fn parse(bits: &mut BitReader) -> Result<Self, ParseError> {
+	pub fn parse(bits: &mut BitReader, _version: ProtocolVersion) -> Result<Self, ParseError> {
 		Ok(FixAngle {
 			relative: bits.read_bit()?,
 			angles: (
@@ -541,7 +539,7 @@ pub struct CrosshairAngle {
 }
 
 impl CrosshairAngle {
-	pub fn parse(bits: &mut BitReader) -> Result<Self, ParseError> {
+	pub fn parse(bits: &mut BitReader, _version: ProtocolVersion) -> Result<Self, ParseError> {
 		Ok(CrosshairAngle {
 			angles: (
 				bits.read_u16()?,
@@ -562,12 +560,16 @@ pub struct Decal {
 }
 
 impl Decal {
-	pub fn parse(bits: &mut BitReader) -> Result<Self, ParseError> {
+	pub fn parse(bits: &mut BitReader, version: ProtocolVersion) -> Result<Self, ParseError> {
+		// TODO: More accurate version check!
+		// This appears to be related to the size of the `modelprecache` string table.
+		let model_index_bits = 12 + (version.0 >= 24) as u8;
+
 		let position = bits.read_vec3()?;
 		let decal_index = bits.read_bits(9)? as u16;
 
 		let (entity_index, model_index) = if bits.read_bit()? {
-			(bits.read_bits(11)? as u16, bits.read_bits(MODEL_INDEX_BITS)? as u16)
+			(bits.read_bits(11)? as u16, bits.read_bits(model_index_bits)? as u16)
 		} else {
 			(0, 0)
 		};
@@ -585,7 +587,7 @@ pub struct UserMessage {
 }
 
 impl UserMessage {
-	pub fn parse(bits: &mut BitReader) -> Result<Self, ParseError> {
+	pub fn parse(bits: &mut BitReader, _version: ProtocolVersion) -> Result<Self, ParseError> {
 		Ok(UserMessage {
 			channel: bits.read_u8()?,
 			data: {
@@ -604,7 +606,7 @@ pub struct EntityMessage {
 }
 
 impl EntityMessage {
-	pub fn parse(bits: &mut BitReader) -> Result<Self, ParseError> {
+	pub fn parse(bits: &mut BitReader, _version: ProtocolVersion) -> Result<Self, ParseError> {
 		Ok(EntityMessage {
 			entity: bits.read_bits(11)? as u16,
 			class:  bits.read_bits(9)? as u16,
@@ -621,7 +623,7 @@ impl EntityMessage {
 pub struct GameEvent(pub Bits);
 
 impl GameEvent {
-	pub fn parse(bits: &mut BitReader) -> Result<Self, ParseError> {
+	pub fn parse(bits: &mut BitReader, _version: ProtocolVersion) -> Result<Self, ParseError> {
 		let bits_len = bits.read_bits(11)? as usize;
 
 		Ok(GameEvent(Bits::copy_into(bits, bits_len)?))
@@ -639,7 +641,7 @@ pub struct Entities {
 }
 
 impl Entities {
-	pub fn parse(bits: &mut BitReader) -> Result<Self, ParseError> {
+	pub fn parse(bits: &mut BitReader, _version: ProtocolVersion) -> Result<Self, ParseError> {
 		let max_entries = bits.read_bits(11)? as u16;
 
 		let delta_from_tick = if bits.read_bit()? {
@@ -670,9 +672,9 @@ pub struct TempEntities {
 }
 
 impl TempEntities {
-	pub fn parse(bits: &mut BitReader) -> Result<Self, ParseError> {
+	pub fn parse(bits: &mut BitReader, version: ProtocolVersion) -> Result<Self, ParseError> {
 		let count = bits.read_u8()?;
-		let bits_len = if USE_VAR_U32 { bits.read_var_u32()? } else {bits.read_bits(17)? };
+		let bits_len = if version.0 >= 24 { bits.read_var_u32()? } else {bits.read_bits(17)? };
 
 		Ok(TempEntities {
 			count,
@@ -683,16 +685,15 @@ impl TempEntities {
 
 #[derive(Debug, Clone)]
 pub struct Prefetch {
-	// TODO: Appears to be a type identifier.
-	pub unknown: bool,
+	pub kind: bool,
 	pub id: u16
 }
 
 impl Prefetch {
-	pub fn parse(bits: &mut BitReader) -> Result<Self, ParseError> {
+	pub fn parse(bits: &mut BitReader, version: ProtocolVersion) -> Result<Self, ParseError> {
 		Ok(Prefetch {
-			unknown: if PREFETCH_HAS_TYPE_IDENTIFIER { bits.read_bit()? } else { false },
-			id:      bits.read_bits(13)? as u16
+			kind: if version.0 >= 23 { bits.read_bit()? } else { false },
+			id:   bits.read_bits(13)? as u16
 		})
 	}
 }
@@ -705,7 +706,7 @@ pub struct PluginMenu {
 }
 
 impl PluginMenu {
-	pub fn parse(bits: &mut BitReader) -> Result<Self, ParseError> {
+	pub fn parse(bits: &mut BitReader, _version: ProtocolVersion) -> Result<Self, ParseError> {
 		Ok(PluginMenu {
 			kind: bits.read_u16()?,
 			data: {
