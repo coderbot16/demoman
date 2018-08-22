@@ -10,7 +10,6 @@ use packets::string_table::StringTables;
 
 #[derive(Debug, Eq, PartialEq, Copy, Clone)]
 pub enum FrameKind {
-	Unused,
 	SignonUpdate,
 	Update,
 	TickSync,
@@ -24,7 +23,6 @@ pub enum FrameKind {
 impl FrameKind {
 	fn from_id(id: u8) -> Option<Self> {
 		Some(match id {
-			0 => FrameKind::Unused,
 			1 => FrameKind::SignonUpdate,
 			2 => FrameKind::Update,
 			3 => FrameKind::TickSync,
@@ -38,6 +36,16 @@ impl FrameKind {
 	}
 }
 
+fn read_u8_array<R>(input: &mut R) -> Result<Vec<u8>, io::Error> where R: Read {
+	let len = input.read_u32::<LittleEndian>()?;
+
+	let mut buf = vec![0; len as usize];
+
+	input.read_exact(&mut buf)?;
+
+	Ok(buf)
+}
+
 #[derive(Debug, Clone)]
 pub struct Frame {
 	pub tick: u32,
@@ -49,6 +57,10 @@ impl Frame {
 		let kind_id = input.read_u8()?;
 		let kind = FrameKind::from_id(kind_id).ok_or(ParseError::BadEnumIndex { name: "FrameKind", value: u32::from(kind_id) })?;
 
+		Frame::parse_with_kind(input, kind)
+	}
+
+	pub fn parse_with_kind<R>(input: &mut R, kind: FrameKind) -> Result<Self, ParseError> where R: Read {
 		let tick = if kind == FrameKind::Stop {
 			(input.read_u16::<LittleEndian>()? as u32) | ((input.read_u8()? as u32) << 16)
 		} else {
@@ -56,65 +68,35 @@ impl Frame {
 		};
 
 		let payload = match kind {
-			FrameKind::Unused         => return Err(ParseError::BadEnumIndex { name: "FrameKind", value: 0 }),
 			FrameKind::SignonUpdate   => FramePayload::SignonUpdate(Update::parse(input)?),
 			FrameKind::Update         => FramePayload::Update(Update::parse(input)?),
 			FrameKind::TickSync       => FramePayload::TickSync,
 			FrameKind::ConsoleCommand => {
-				let len = input.read_u32::<LittleEndian>()?;
+				let mut buf = read_u8_array(input)?;
 
-				let mut data = Vec::with_capacity(len as usize);
-
-				for _ in 0..len {
-					let value = input.read_u8()?;
-
-					if value == 0 {
+				let mut terminator = None;
+				for (index, &byte) in buf.iter().enumerate() {
+					if byte == 0 {
+						terminator = Some(index);
 						break;
 					}
-
-					data.push(value);
 				}
 
-				FramePayload::ConsoleCommand(String::from_utf8(data)?)
+				if let Some(terminator) = terminator {
+					for _ in 0..(buf.len() - terminator) {
+						buf.pop();
+					}
+				}
+
+				FramePayload::ConsoleCommand(String::from_utf8(buf)?)
 			},
-			FrameKind::UserCmdDelta => {
-				let sequence = input.read_u32::<LittleEndian>()?;
-
-				let len = input.read_u32::<LittleEndian>()?;
-				let mut buf = vec![0; len as usize];
-				input.read_exact(&mut buf)?;
-
-				let mut bits = BitReader::new(&buf);
-
-				let delta = UserCmdDelta::parse(&mut bits)?;
-
-				FramePayload::UserCmdDelta { sequence, delta }
+			FrameKind::UserCmdDelta => FramePayload::UserCmdDelta {
+				sequence: input.read_u32::<LittleEndian>()?,
+				frame: UserCmdFrame::from_raw(read_u8_array(input)?)
 			},
-			FrameKind::DataTables => {
-				let len = input.read_u32::<LittleEndian>()?;
-				let mut buf = vec![0; len as usize];
-				input.read_exact(&mut buf)?;
-
-				let mut bits = BitReader::new(&buf);
-
-				let tables = DataTables::parse(&mut bits)?;
-				assert_eq!(bits.unread_bytes(), 0);
-
-				FramePayload::DataTables(tables)
-			},
+			FrameKind::DataTables => FramePayload::DataTables(DataTablesFrame::from_raw(read_u8_array(input)?)),
 			FrameKind::Stop => FramePayload::Stop,
-			FrameKind::StringTables => {
-				let len = input.read_u32::<LittleEndian>()?;
-				let mut buf = vec![0; len as usize];
-				input.read_exact(&mut buf)?;
-
-				let mut bits = BitReader::new(&buf);
-
-				let tables = StringTables::parse(&mut bits)?;
-				assert_eq!(bits.unread_bytes(), 0);
-
-				FramePayload::StringTables(tables)
-			}
+			FrameKind::StringTables => FramePayload::StringTables(StringTablesFrame::from_raw(read_u8_array(input)?))
 		};
 
 		Ok(Frame { tick, payload })
@@ -127,10 +109,10 @@ pub enum FramePayload {
 	Update(Update),
 	TickSync,
 	ConsoleCommand(String),
-	UserCmdDelta { sequence: u32, delta: UserCmdDelta },
-	DataTables(DataTables),
+	UserCmdDelta { sequence: u32, frame: UserCmdFrame },
+	DataTables(DataTablesFrame),
 	Stop,
-	StringTables(StringTables)
+	StringTables(StringTablesFrame)
 }
 
 impl FramePayload {
@@ -167,5 +149,80 @@ impl Update {
 		input.read_exact(&mut packets)?;
 
 		Ok(Update { position, sequence_in, sequence_out, packets })
+	}
+}
+
+#[derive(Debug, Clone)]
+pub struct DataTablesFrame(Vec<u8>);
+impl DataTablesFrame {
+	pub fn from_raw(data: Vec<u8>) -> Self {
+		DataTablesFrame(data)
+	}
+
+	pub fn parse(&self) -> Result<DataTables, ParseError> {
+		let mut bits = BitReader::new(&self.0);
+
+		let tables = DataTables::parse(&mut bits)?;
+		assert_eq!(bits.unread_bytes(), 0);
+
+		Ok(tables)
+	}
+
+	pub fn raw(&self) -> &[u8] {
+		&self.0
+	}
+
+	pub fn into_raw(self) -> Vec<u8> {
+		self.0
+	}
+}
+
+#[derive(Debug, Clone)]
+pub struct StringTablesFrame(Vec<u8>);
+impl StringTablesFrame {
+	pub fn from_raw(data: Vec<u8>) -> Self {
+		StringTablesFrame(data)
+	}
+
+	pub fn parse(&self) -> Result<StringTables, ParseError> {
+		let mut bits = BitReader::new(&self.0);
+
+		let tables = StringTables::parse(&mut bits)?;
+		assert_eq!(bits.unread_bytes(), 0);
+
+		Ok(tables)
+	}
+
+	pub fn raw(&self) -> &[u8] {
+		&self.0
+	}
+
+	pub fn into_raw(self) -> Vec<u8> {
+		self.0
+	}
+}
+
+#[derive(Debug, Clone)]
+pub struct UserCmdFrame(Vec<u8>);
+impl UserCmdFrame {
+	pub fn from_raw(data: Vec<u8>) -> Self {
+		UserCmdFrame(data)
+	}
+
+	pub fn parse(&self) -> Result<UserCmdDelta, ParseError> {
+		let mut bits = BitReader::new(&self.0);
+
+		let tables = UserCmdDelta::parse(&mut bits)?;
+		assert_eq!(bits.unread_bytes(), 0);
+
+		Ok(tables)
+	}
+
+	pub fn raw(&self) -> &[u8] {
+		&self.0
+	}
+
+	pub fn into_raw(self) -> Vec<u8> {
+		self.0
 	}
 }

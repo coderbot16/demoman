@@ -8,7 +8,7 @@ use dem::demo::bits::Bits;
 use dem::packets::{ProtocolVersion, PacketKind, Packet, PlaySound, SetCvars, GameEvent};
 use dem::packets::game_events::{GameEventList, GameEventInfo, Kind};
 use dem::packets::string_table::Extra;
-use dem::demo::frame::{Frame, FramePayload};
+use dem::demo::frame::{Frame, FrameKind, FramePayload};
 
 use std::io::{BufReader, Read, Seek, SeekFrom};
 use std::fs::File;
@@ -89,13 +89,22 @@ fn main() {
 			},
 			FramePayload::TickSync => println!("| Tick Sync"),
 			FramePayload::ConsoleCommand(command) => if SHOW_COMMANDS { println!("> {}", command) },
-			FramePayload::UserCmdDelta { sequence: _, delta: _ } => /*println!("| UserCmdDelta (hidden)")*/(),
-			FramePayload::DataTables(tables) => if SHOW_DATA_TABLES { println!("| Data Tables - {} tables, {} class links", tables.tables.len(), tables.links.len()) },
+			FramePayload::UserCmdDelta { sequence: _, frame } => {
+				let _frame = frame.parse().unwrap();
+				/*println!("| UserCmdDelta (hidden)")*/()
+			},
+			FramePayload::DataTables(tables) => {
+				let tables = tables.parse().unwrap();
+
+				if SHOW_DATA_TABLES { println!("| Data Tables - {} tables, {} class links", tables.tables.len(), tables.links.len()) }
+			},
 			FramePayload::Stop => {
 				println!("| Stop");
 				break;
 			},
 			FramePayload::StringTables(tables) => {
+				let tables = tables.parse().unwrap();
+
 				if !SHOW_STRING_TABLES {
 					continue;
 				}
