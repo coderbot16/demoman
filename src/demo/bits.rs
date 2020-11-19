@@ -1,4 +1,20 @@
-use crate::demo::parse::{ParseError, Needed};
+use std::string::FromUtf8Error;
+
+/// Error generated when less bits are available than needed for the given operation
+#[derive(Debug)]
+pub struct InsufficientBits {
+	// PERF: this is 16 bytes on most platforms, which hurts the happy path way more than it
+	// should, since we should never actually encounter this error on regular demo files.
+	pub requested: usize,
+	pub available: usize
+}
+
+/// An error generated while reading a string from a bit stream
+#[derive(Debug)]
+pub enum ReadStringError {
+	InsufficientBits(InsufficientBits),
+	Utf8(FromUtf8Error)
+}
 
 pub struct BitReader<'i> {
 	input: &'i [u8],
@@ -82,9 +98,12 @@ impl<'i> BitReader<'i> {
 		}
 	}
 
-	pub fn read_bit(&mut self) -> Result<bool, ParseError> {
+	pub fn read_bit(&mut self) -> Result<bool, InsufficientBits> {
 		if self.available < 1 {
-			return Err(ParseError::Needed(Needed::Bits { requested: 1, available: self.available as usize }));
+			return Err(InsufficientBits {
+				requested: 1,
+				available: self.available as usize
+			});
 		}
 
 		let bit = (self.bits & 1) == 1;
@@ -120,7 +139,7 @@ impl<'i> BitReader<'i> {
 		bits
 	}
 
-	pub fn read_bits(&mut self, count: u8) -> Result<u32, ParseError> {
+	pub fn read_bits(&mut self, count: u8) -> Result<u32, InsufficientBits> {
 		if count == 0 {
 			return Ok(0);
 		}
@@ -134,7 +153,10 @@ impl<'i> BitReader<'i> {
 			let needed = count - taken;
 
 			if self.unread_bytes() < 4 && (self.unread_bytes() as u8) * 8 < needed {
-				return Err(ParseError::Needed(Needed::Bits { requested: count as usize, available: taken as usize + self.unread_bytes() * 8 }));
+				return Err(InsufficientBits {
+					requested: count as usize,
+					available: taken as usize + self.unread_bytes() * 8
+				});
 			}
 
 			let parts = (
@@ -146,11 +168,11 @@ impl<'i> BitReader<'i> {
 		}
 	}
 
-	pub fn read_u8(&mut self) -> Result<u8, ParseError> {
+	pub fn read_u8(&mut self) -> Result<u8, InsufficientBits> {
 		self.read_bits(8).map(|x| x as u8)
 	}
 
-	pub fn read_u8_array(&mut self, len: usize) -> Result<Vec<u8>, ParseError> {
+	pub fn read_u8_array(&mut self, len: usize) -> Result<Vec<u8>, InsufficientBits> {
 		let mut data = Vec::with_capacity(len);
 
 		self.read_u8_array_into(&mut data, len)?;
@@ -158,9 +180,12 @@ impl<'i> BitReader<'i> {
 		Ok(data)
 	}
 
-	pub fn read_u8_array_into(&mut self, data: &mut Vec<u8>, len: usize) -> Result<(), ParseError> {
+	pub fn read_u8_array_into(&mut self, data: &mut Vec<u8>, len: usize) -> Result<(), InsufficientBits> {
 		if !self.has_remaining_bytes(len) {
-			return Err(ParseError::Needed(Needed::Bytes { requested: len, available: self.remaining_bytes() }));
+			return Err(InsufficientBits {
+				requested: len,
+				available: self.remaining_bytes()
+			});
 		}
 
 		for _ in 0..len {
@@ -170,31 +195,31 @@ impl<'i> BitReader<'i> {
 		Ok(())
 	}
 
-	pub fn read_u16(&mut self) -> Result<u16, ParseError> {
+	pub fn read_u16(&mut self) -> Result<u16, InsufficientBits> {
 		self.read_bits(16).map(|x| x as u16)
 	}
 
-	pub fn read_u32(&mut self) -> Result<u32, ParseError> {
+	pub fn read_u32(&mut self) -> Result<u32, InsufficientBits> {
 		self.read_bits(32).map(|x| x as u32)
 	}
 
-	pub fn read_f32(&mut self) -> Result<f32, ParseError> {
+	pub fn read_f32(&mut self) -> Result<f32, InsufficientBits> {
 		self.read_u32().map(f32::from_bits)
 	}
 
-	pub fn read_i8(&mut self) -> Result<i8, ParseError> {
+	pub fn read_i8(&mut self) -> Result<i8, InsufficientBits> {
 		self.read_u8().map(|x| x as i8)
 	}
 
-	pub fn read_i16(&mut self) -> Result<i16, ParseError> {
+	pub fn read_i16(&mut self) -> Result<i16, InsufficientBits> {
 		self.read_u16().map(|x| x as i16)
 	}
 
-	pub fn read_i32(&mut self) -> Result<i32, ParseError> {
+	pub fn read_i32(&mut self) -> Result<i32, InsufficientBits> {
 		self.read_u32().map(|x| x as i32)
 	}
 
-	pub fn read_var(&mut self) -> Result<u32, ParseError> {
+	pub fn read_var(&mut self) -> Result<u32, InsufficientBits> {
 		match self.read_bits(2)? {
 			0 => self.read_bits(4),
 			1 => self.read_u8().map(u32::from),
@@ -203,7 +228,7 @@ impl<'i> BitReader<'i> {
 		}
 	}
 
-	pub fn read_coord(&mut self) -> Result<f32, ParseError> {
+	pub fn read_coord(&mut self) -> Result<f32, InsufficientBits> {
 		// TODO: This is not pure, parse errors are not recoverable.
 
 		let integral = self.read_bit()?;
@@ -232,7 +257,7 @@ impl<'i> BitReader<'i> {
 		}
 	}
 
-	pub fn read_vec3(&mut self) -> Result<(f32, f32, f32), ParseError> {
+	pub fn read_vec3(&mut self) -> Result<(f32, f32, f32), InsufficientBits> {
 		// TODO: This is not pure, parse errors are not recoverable.
 
 		let x = self.read_bit()?;
@@ -246,13 +271,13 @@ impl<'i> BitReader<'i> {
 		))
 	}
 
-	pub fn read_string(&mut self) -> Result<String, ParseError> {
+	pub fn read_string(&mut self) -> Result<String, ReadStringError> {
 		// TODO: This is not pure, parse errors are not recoverable.
 
 		let mut data = Vec::new();
 
 		loop {
-			let value = self.read_u8()?;
+			let value = self.read_u8().map_err(ReadStringError::InsufficientBits)?;
 
 			if value == 0 {
 				break;
@@ -261,10 +286,10 @@ impl<'i> BitReader<'i> {
 			data.push(value);
 		}
 
-		String::from_utf8(data).map_err(ParseError::Utf8)
+		String::from_utf8(data).map_err(ReadStringError::Utf8)
 	}
 
-	pub fn read_var_u32(&mut self) -> Result<u32, ParseError> {
+	pub fn read_var_u32(&mut self) -> Result<u32, InsufficientBits> {
 		// TODO: This is not pure, parse errors are not recoverable.
 
 		let mut result = 0;
@@ -298,9 +323,12 @@ impl Bits {
 		Bits { data, trailing_bits: 0 }
 	}
 
-	pub fn copy_into(bits: &mut BitReader, count: usize) -> Result<Self, ParseError> {
+	pub fn copy_into(bits: &mut BitReader, count: usize) -> Result<Self, InsufficientBits> {
 		if !bits.has_remaining(count) {
-			return Err(ParseError::Needed(Needed::Bits { requested: count, available: bits.remaining_bits() }));
+			return Err(InsufficientBits {
+				requested: count, 
+				available: bits.remaining_bits()
+			});
 		}
 
 		let trailing_bits = (count % 8) as u8;
