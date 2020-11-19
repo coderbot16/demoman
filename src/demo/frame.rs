@@ -1,5 +1,4 @@
 use std::io::{self, Read};
-use byteorder::{ReadBytesExt, LittleEndian};
 use demo::bits::BitReader;
 use demo::parse::ParseError;
 use demo::data_table::DataTables;
@@ -36,8 +35,36 @@ impl FrameKind {
 	}
 }
 
+fn read_u8<R>(input: &mut R) -> Result<u8, io::Error> where R: Read {
+	let mut byte = [0u8; 1];
+
+	input.read_exact(&mut byte)?;
+
+	Ok(byte[0])
+}
+
+fn read_u24<R>(input: &mut R) -> Result<u32, io::Error> where R: Read {
+	let mut bytes = [0u8; 4];
+
+	// Only read the first 3 bytes, so that the last byte is empty
+	// Since this is little-endian byte order, the last byte being empty means that
+	// the most significant byte (x << 24) will be zero, which is what we'd expect
+	// for a 24-bit value stored in a 32-bit data type.
+	input.read_exact(&mut bytes[0..3])?;
+
+	Ok(u32::from_le_bytes(bytes))
+}
+
+fn read_u32<R>(input: &mut R) -> Result<u32, io::Error> where R: Read {
+	let mut bytes = [0u8; 4];
+
+	input.read_exact(&mut bytes)?;
+
+	Ok(u32::from_le_bytes(bytes))
+}
+
 fn read_u8_array<R>(input: &mut R) -> Result<Vec<u8>, io::Error> where R: Read {
-	let len = input.read_u32::<LittleEndian>()?;
+	let len = read_u32(input)?;
 
 	let mut buf = vec![0; len as usize];
 
@@ -54,7 +81,7 @@ pub struct Frame {
 
 impl Frame {
 	pub fn parse<R>(input: &mut R) -> Result<Self, ParseError> where R: Read {
-		let kind_id = input.read_u8()?;
+		let kind_id = read_u8(input)?;
 		let kind = FrameKind::from_id(kind_id).ok_or(ParseError::BadEnumIndex { name: "FrameKind", value: u32::from(kind_id) })?;
 
 		Frame::parse_with_kind(input, kind)
@@ -62,9 +89,9 @@ impl Frame {
 
 	pub fn parse_with_kind<R>(input: &mut R, kind: FrameKind) -> Result<Self, ParseError> where R: Read {
 		let tick = if kind == FrameKind::Stop {
-			(input.read_u16::<LittleEndian>()? as u32) | ((input.read_u8()? as u32) << 16)
+			read_u24(input)?
 		} else {
-			input.read_u32::<LittleEndian>()?
+			read_u32(input)?
 		};
 
 		let payload = match kind {
@@ -91,7 +118,7 @@ impl Frame {
 				FramePayload::ConsoleCommand(String::from_utf8(buf)?)
 			},
 			FrameKind::UserCmdDelta => FramePayload::UserCmdDelta {
-				sequence: input.read_u32::<LittleEndian>()?,
+				sequence: read_u32(input)?,
 				frame: UserCmdFrame::from_raw(read_u8_array(input)?)
 			},
 			FrameKind::DataTables => FramePayload::DataTables(DataTablesFrame::from_raw(read_u8_array(input)?)),
@@ -140,15 +167,12 @@ pub struct Update {
 
 impl Update {
 	pub fn parse<R>(input: &mut R) -> Result<Self, io::Error> where R: Read {
-		let position = PositionUpdate::parse(input)?;
-		let sequence_in = input.read_u32::<LittleEndian>()?;
-		let sequence_out = input.read_u32::<LittleEndian>()?;
-
-		let len = input.read_u32::<LittleEndian>()?;
-		let mut packets = vec![0; len as usize];
-		input.read_exact(&mut packets)?;
-
-		Ok(Update { position, sequence_in, sequence_out, packets })
+		Ok(Update {
+			position: PositionUpdate::read(input)?,
+			sequence_in: read_u32(input)?,
+			sequence_out: read_u32(input)?,
+			packets: read_u8_array(input)?
+		})
 	}
 }
 

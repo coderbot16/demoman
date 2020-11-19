@@ -1,6 +1,7 @@
 use std::fmt::{Debug, Formatter, Error};
 use std::str::{self, Utf8Error};
 use std::convert::TryInto;
+use demo::bytes::Reader;
 
 pub const PATH_LENGTH: usize = 260;
 pub const HEADER_LENGTH: usize = 8 + 4 + 4 + PATH_LENGTH + PATH_LENGTH + PATH_LENGTH + PATH_LENGTH + 4 + 4 + 4 + 4; // 1072
@@ -46,6 +47,9 @@ impl<'s> Debug for HeaderStr<'s> {
 }
 
 #[derive(Debug)]
+pub struct IncorrectMagic<'a>(&'a [u8]);
+
+#[derive(Debug)]
 pub struct DemoHeader<'data> {
 	pub demo_protocol:    i32,
 	pub network_protocol: i32,
@@ -61,11 +65,9 @@ pub struct DemoHeader<'data> {
 
 impl<'data> DemoHeader<'data> {
 	pub fn parse(data: &'data [u8; HEADER_LENGTH]) -> Result<DemoHeader, IncorrectMagic> {
-		let mut reader  = Reader {
-			bytes: data
-		};
+		let mut reader  = Reader::new(data);
 
-		let magic = reader.grab(8);
+		let magic = reader.bytes(8);
 
 		if magic !=  b"HL2DEMO\0" {
 			return Err(IncorrectMagic(magic));
@@ -74,10 +76,10 @@ impl<'data> DemoHeader<'data> {
 		Ok(DemoHeader {
 			demo_protocol: reader.i32(),
 			network_protocol: reader.i32(),
-			server_name: reader.str(),
-			client_name: reader.str(),
-			map_name: reader.str(),
-			game_directory: reader.str(),
+			server_name: str(&mut reader),
+			client_name: str(&mut reader),
+			map_name: str(&mut reader),
+			game_directory: str(&mut reader),
 			playback_seconds: reader.f32(),
 			ticks: reader.i32(),
 			frames: reader.i32(),
@@ -86,38 +88,6 @@ impl<'data> DemoHeader<'data> {
 	}
 }
 
-#[derive(Debug)]
-pub struct IncorrectMagic<'a>(&'a [u8]);
-
-struct Reader<'a> {
-	bytes: &'a [u8]
-}
-
-impl<'a> Reader<'a> {
-	fn grab(&mut self, len: usize) -> &'a [u8] {
-		let (requested, rest) = self.bytes.split_at(len);
-		self.bytes = rest;
-
-		requested
-	}
-
-	fn str(&mut self) -> HeaderStr<'a> {
-		HeaderStr::from_slice(self.grab(260)).unwrap()
-	}
-
-	fn u32(&mut self) -> u32 {
-		if let &[a, b, c, d] = self.grab(4) {
-			u32::from_le_bytes([a, b, c, d])
-		} else {
-			unreachable!()
-		}
-	}
-
-	fn i32(&mut self) -> i32 {
-		self.u32() as i32
-	}
-
-	fn f32(&mut self) -> f32 {
-		f32::from_bits(self.u32())
-	}
+fn str<'a>(reader: &mut Reader<'a>) -> HeaderStr<'a> {
+	HeaderStr::from_slice(reader.bytes(260)).unwrap()
 }

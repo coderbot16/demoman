@@ -9,5 +9,4 @@ name = "dem_test"
 path = "src/main.rs"
 
 [dependencies]
-byteorder = "1.0.0"
 snap = "1.0.2"

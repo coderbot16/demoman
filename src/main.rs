@@ -1,5 +1,4 @@
 extern crate dem;
-extern crate byteorder;
 extern crate snap;
 
 use dem::demo::header::{self, DemoHeader};

@@ -1,7 +1,8 @@
-use byteorder::{LittleEndian, ReadBytesExt};
 use std::io::{self, Read};
 use demo::bits::BitReader;
 use demo::parse::ParseError;
+use demo::bytes::Reader;
+use std::convert::TryInto;
 
 /// Delta encoded UserCmd.
 /// None values represent that the value did not change.
@@ -60,12 +61,25 @@ pub struct PositionUpdate {
 }
 
 impl PositionUpdate {
-	pub fn parse<R: Read>(input: &mut R) -> io::Result<Self> {
-		Ok(PositionUpdate {
-			flags:     input.read_u32::<LittleEndian>()?,
-			original:  Position::parse(input)?,
-			resampled: Position::parse(input)?
-		})
+	// u32 + 2x Position
+	pub const LEN: usize = 4 + Position::LEN * 2;
+
+	pub fn read<R: Read>(input: &mut R) -> io::Result<Self> {
+		let mut bytes = [0u8; Self::LEN];
+
+		input.read_exact(&mut bytes)?;
+
+		Ok(Self::from_bytes(bytes))
+	}
+
+	pub fn from_bytes(bytes: [u8; Self::LEN]) -> Self {
+		let mut reader = Reader::new(&bytes);
+
+		PositionUpdate {
+			flags:     reader.u32(),
+			original:  Position::read(&mut reader),
+			resampled: Position::read(&mut reader)
+		}
 	}
 }
 
@@ -77,11 +91,21 @@ pub struct Position {
 }
 
 impl Position {
-	pub fn parse<R: Read>(input: &mut R) -> io::Result<Self> {
-		Ok(Position {
-			view_orgin:        (input.read_f32::<LittleEndian>()?, input.read_f32::<LittleEndian>()?, input.read_f32::<LittleEndian>()?),
-			view_angles:       (input.read_f32::<LittleEndian>()?, input.read_f32::<LittleEndian>()?, input.read_f32::<LittleEndian>()?),
-			view_angles_local: (input.read_f32::<LittleEndian>()?, input.read_f32::<LittleEndian>()?, input.read_f32::<LittleEndian>()?)
-		})
+	// 4 bytes per float * 3 floats per vector * 3 vectors
+	pub const LEN: usize = 4 * 3 * 3;
+
+	fn read(reader: &mut Reader) -> Self {
+		// Infallible as long as the reader has sufficient bytes
+		Self::from_bytes(reader.bytes(Self::LEN).try_into().unwrap())
+	}
+
+	pub fn from_bytes(bytes: &[u8; Self::LEN]) -> Self {
+		let mut reader = Reader::new(bytes);
+
+		Position {
+			view_orgin:        (reader.f32(), reader.f32(), reader.f32()),
+			view_angles:       (reader.f32(), reader.f32(), reader.f32()),
+			view_angles_local: (reader.f32(), reader.f32(), reader.f32())
+		}
 	}
 }
