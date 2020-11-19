@@ -12,20 +12,6 @@ use dem::demo::frame::{Frame, FrameKind, FramePayload};
 use std::io::{BufReader, Read, Seek, SeekFrom};
 use std::fs::File;
 
-const PATH: &str = "/home/coderbot/Source/HowToMedicFortress_coderbot_1200_USA.dem";
-//const PATH: &str = "/home/coderbot/.steam/steam/steamapps/common/Team Fortress 2/tf/demos/2018-06-14_17-43-32.dem";
-//const PATH: &str = "/home/coderbot/.steam/steam/steamapps/common/Team Fortress 2/tf/demos/2017-12-23_16-43-13.dem";
-//const PATH: &str = "/home/coderbot/.steam/steam/steamapps/common/Team Fortress 2/tf/demos/2018-07-28_22-43-39.dem";
-//const PATH: &str = "/home/coderbot/.steam/steam/steamapps/common/Team Fortress 2/tf/demos/2018-08-11_21-53-34.dem";
-//const PATH: &str = "/home/coderbot/.steam/steam/steamapps/common/Team Fortress 2/tf/demos/2016-12-07_18-25-34.dem";
-//const PATH: &str = "/home/coderbot/Source/TF2 Demo Test Data/2013-04-10-Granary.dem";
-//const PATH: &str = "/home/coderbot/Source/TF2 Demo Test Data/2013-02-19-ctf_haunt_b2.dem";
-//const PATH: &str = "/home/coderbot/Source/TF2 Demo Test Data/2012-07-23-Steel.dem";
-//const PATH: &str = "/home/coderbot/Source/TF2 Demo Test Data/2012-06-29-Dustbowl.dem";
-//const PATH: &str = "/home/coderbot/Source/TF2 Demo Test Data/2010-04-07-Badlands.dem";
-//const PATH: &str = "/home/coderbot/Source/TF2 Demo Test Data/2009-10-22-Granary.dem";
-//const PATH: &str = "/home/coderbot/.steam/steam/steamapps/common/Half-Life 2/hl2/first.dem";
-
 const MAX_PARSED_PACKETS: usize = 4096;
 //const MAX_PARSED_PACKETS: usize = 4_000_000_000;
 const SHOW_STRING_TABLES: bool = false;
@@ -39,7 +25,24 @@ trait Handler {
 }
 
 fn main() {
-	let mut file = BufReader::new(File::open(PATH).unwrap());
+	let path = match std::env::args().skip(1).next() {
+		Some(path) => path,
+		None => {
+			eprintln!("Usage: demoman <file>");
+			return;
+		}
+	};
+
+	let file = match File::open(path) {
+		Ok(file) => file,
+		Err(err) => {
+			eprintln!("couldn't open demo file for reading: {}", err);
+			eprintln!("note: Make sure you typed the path correctly and have the right permissions");
+			return;
+		}
+	};
+
+	let mut file = BufReader::new(file);
 
 	let mut buf = [0; header::HEADER_LENGTH];
 	file.read(&mut buf[0..]).unwrap();
