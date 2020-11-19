@@ -7,7 +7,7 @@ use dem::demo::bits::Bits;
 use dem::packets::{ProtocolVersion, PacketKind, Packet, PlaySound, SetCvars, GameEvent};
 use dem::packets::game_events::{GameEventList, GameEventInfo, Kind};
 use dem::packets::string_table::Extra;
-use dem::demo::frame::{Frame, FrameKind, FramePayload};
+use dem::demo::frame::{Frame, FramePayload};
 
 use std::io::{BufReader, Read, Seek, SeekFrom};
 use std::fs::File;
@@ -402,7 +402,9 @@ impl Handler for PrintAll {
 			Packet::Entities(packet)         => {
 				println!("Entries: {} updated / {} max, Baseline: {} Update Baseline: {}, Delta From Tick: {:?}, Bits: {}", packet.updated, packet.max_entries, packet.baseline, packet.update_baseline, packet.delta_from_tick, packet.data.bits_len());
 
-				let mut bits = packet.data.reader();
+				// TODO: Parse entities properly
+
+				/*let mut bits = packet.data.reader();
 
 				#[derive(Debug, Eq, PartialEq, Copy, Clone)]
 				enum UpdateType {
@@ -410,7 +412,7 @@ impl Handler for PrintAll {
 					LeavePvs,
 					Delete,
 					Delta,
-					Finished,
+					// TODO Finished,
 					Preserve
 				}
 
@@ -442,7 +444,7 @@ impl Handler for PrintAll {
 							UpdateType::LeavePvs | UpdateType::Delete => (),
 							UpdateType::Delta => (),
 							UpdateType::Preserve => (),
-							UpdateType::Finished => unreachable!()
+							// TODO: UpdateType::Finished => unreachable!()
 						}
 
 						println!("  {:>17} : Update Type: {:?}", "", update_type);
@@ -451,7 +453,7 @@ impl Handler for PrintAll {
 							break 'outer;
 						}
 					}
-				}
+				}*/
 			},
 			Packet::TempEntities(packet)     => println!("Count: {}, Bits: {}", packet.count, packet.data.bits_len()),
 			Packet::Prefetch(packet)         => println!("{:?}", packet),

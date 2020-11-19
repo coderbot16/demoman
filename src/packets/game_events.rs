@@ -1,4 +1,4 @@
-use demo::bits::BitReader;
+use demo::bits::{BitReader, Bits};
 use demo::parse::ParseError;
 
 #[derive(Debug, Eq, PartialEq, Clone)]
@@ -9,10 +9,14 @@ impl GameEventList {
 		let count = bits.read_bits(9)?;
 		let bits_len = bits.read_bits(20)?;
 
+		// Bits are nested inside the bits, yo
+		let payload = Bits::copy_into(bits, bits_len as usize)?;
+		let mut bits = payload.reader();
+
 		let mut infos = Vec::with_capacity(count as usize);
 
 		for _ in 0..count {
-			infos.push(GameEventInfo::parse(bits)?);
+			infos.push(GameEventInfo::parse(&mut bits)?);
 		}
 
 		// TODO: Verify bit length.

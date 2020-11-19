@@ -85,7 +85,8 @@ pub struct SoundData {
 	pub speaker: i16 // 12 bits, signed
 }
 
-impl Default for SoundData {
+// TODO: Properly implement this
+/*impl Default for SoundData {
 	fn default() -> Self {
 		SoundData {
 			sequence: 0,
@@ -97,7 +98,7 @@ impl Default for SoundData {
 			speaker: -1
 		}
 	}
-}
+}*/
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct SoundDataDelta {
