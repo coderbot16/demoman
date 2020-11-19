@@ -2,8 +2,6 @@ pub mod demo;
 pub mod packets;
 pub mod payload;
 
-#[macro_use]
-extern crate arrayref;
 extern crate byteorder;
 extern crate snap;
 

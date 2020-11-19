@@ -1,5 +1,6 @@
 use std::fmt::{Debug, Formatter, Error};
 use std::str::{self, Utf8Error};
+use std::convert::TryInto;
 
 pub const PATH_LENGTH: usize = 260;
 pub const HEADER_LENGTH: usize = 8 + 4 + 4 + PATH_LENGTH + PATH_LENGTH + PATH_LENGTH + PATH_LENGTH + 4 + 4 + 4 + 4; // 1072
@@ -9,11 +10,7 @@ pub struct HeaderString([u8; 260]);
 pub struct HeaderStr<'s>(& 's [u8; 260]);
 impl<'s> HeaderStr<'s> {
 	pub fn from_slice(slice: &'s [u8]) -> Option<Self> {
-		if slice.len() != 260 {
-			None
-		} else {
-			Some(HeaderStr(array_ref![slice, 0, 260]))
-		}
+		slice.try_into().ok().map(HeaderStr)
 	}
 
 	pub fn bytes(&self) -> &[u8; 260] {
