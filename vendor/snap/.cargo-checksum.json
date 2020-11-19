@@ -1,0 +1,7 @@
+{
+	"__comment1__": "Sneaky trick taken from https://blogs.gnome.org/mcatanzaro/2020/05/18/patching-vendored-rust-dependencies/",
+	"__comment2__": "I removed the 'data' directory since it has 3 MB of unused test files",
+	"__comment3__": "TODO: Remove this once https://github.com/BurntSushi/rust-snappy/issues/37 is resolved",
+	"files": {},
+	"package": "8a807ac3ab7a217829c2a3b65732b926b2befe6a35f33b4bf8b503692430f223"
+}
