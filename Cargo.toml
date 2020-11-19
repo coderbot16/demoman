@@ -11,4 +11,4 @@ path = "src/main.rs"
 [dependencies]
 arrayref = "^0.3.2"
 byteorder = "1.0.0"
-snap = "0.2.3"
+snap = "1.0.2"

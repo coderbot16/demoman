@@ -2,8 +2,7 @@ use demo::bits::BitReader;
 use demo::parse::ParseError;
 use packets::string_table::StringTable;
 use packets::CreateStringTable;
-
-extern crate snap;
+use snap::raw::Decoder;
 
 #[repr(u32)]
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
@@ -33,7 +32,8 @@ pub struct NewStringTable {
 
 impl NewStringTable {
 	pub fn from_packet(packet: CreateStringTable) -> Result<Self, ParseError> {
-		let mut table = StringTable::create(packet.entries as usize, packet.max_entries as usize, packet.fixed_userdata_size.map(|(bytes, bits)| bits));
+		let fixed_extra_size = packet.fixed_userdata_size.map(|(_bytes, bits)| bits);
+		let mut table = StringTable::create(packet.entries as usize, packet.max_entries as usize, fixed_extra_size);
 
 		let mut bits = packet.data.reader();
 
@@ -56,8 +56,7 @@ impl NewStringTable {
 
 			let uncompressed = match compression {
 				CompressionType::Snappy => {
-					let mut snappy = snap::Decoder::new();
-					snappy.decompress_vec(&compressed).expect("invalid snappy data")
+					Decoder::new().decompress_vec(&compressed).expect("invalid snappy data")
 				},
 				CompressionType::Lzss => {
 					println!("ERROR!");

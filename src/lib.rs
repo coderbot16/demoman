@@ -5,6 +5,7 @@ pub mod payload;
 #[macro_use]
 extern crate arrayref;
 extern crate byteorder;
+extern crate snap;
 
 #[cfg(test)]
 mod tests {
