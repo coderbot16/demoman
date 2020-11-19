@@ -1,6 +1,6 @@
 use std::io;
 use std::string::FromUtf8Error;
-use crate::demo::bits::{BitReader, InsufficientBits, ReadStringError};
+use bitstream::{BitReader, InsufficientBits, ReadStringError};
 use std::borrow::Cow;
 
 #[derive(Debug)]

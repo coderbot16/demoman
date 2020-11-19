@@ -1,4 +1,4 @@
-use crate::demo::bits::BitReader;
+use bitstream::BitReader;
 use crate::demo::parse::ParseError;
 use crate::packets::string_table::StringTable;
 use crate::packets::CreateStringTable;

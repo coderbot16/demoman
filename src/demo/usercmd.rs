@@ -1,7 +1,6 @@
 use std::io::{self, Read};
-use crate::demo::bits::BitReader;
+use bitstream::{BitReader, ByteReader};
 use crate::demo::parse::ParseError;
-use crate::demo::bytes::Reader;
 use std::convert::TryInto;
 
 /// Delta encoded UserCmd.
@@ -73,7 +72,7 @@ impl PositionUpdate {
 	}
 
 	pub fn from_bytes(bytes: [u8; Self::LEN]) -> Self {
-		let mut reader = Reader::new(&bytes);
+		let mut reader = ByteReader::new(&bytes);
 
 		PositionUpdate {
 			flags:     reader.u32(),
@@ -94,13 +93,13 @@ impl Position {
 	// 4 bytes per float * 3 floats per vector * 3 vectors
 	pub const LEN: usize = 4 * 3 * 3;
 
-	fn read(reader: &mut Reader) -> Self {
+	fn read(reader: &mut ByteReader) -> Self {
 		// Infallible as long as the reader has sufficient bytes
 		Self::from_bytes(reader.bytes(Self::LEN).try_into().unwrap())
 	}
 
 	pub fn from_bytes(bytes: &[u8; Self::LEN]) -> Self {
-		let mut reader = Reader::new(bytes);
+		let mut reader = ByteReader::new(bytes);
 
 		Position {
 			view_orgin:        (reader.f32(), reader.f32(), reader.f32()),

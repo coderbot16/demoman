@@ -1,10 +1,10 @@
-pub struct Reader<'a> {
+pub struct ByteReader<'a> {
 	bytes: &'a [u8]
 }
 
-impl<'a> Reader<'a> {
+impl<'a> ByteReader<'a> {
 	pub fn new(bytes: &'a [u8]) -> Self {
-		Reader {
+		ByteReader {
 			bytes
 		}
 	}

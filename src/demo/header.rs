@@ -1,7 +1,7 @@
 use std::fmt::{Debug, Formatter, Error};
 use std::str::{self, Utf8Error};
 use std::convert::TryInto;
-use crate::demo::bytes::Reader;
+use bitstream::ByteReader;
 
 pub const PATH_LENGTH: usize = 260;
 pub const HEADER_LENGTH: usize = 8 + 4 + 4 + PATH_LENGTH + PATH_LENGTH + PATH_LENGTH + PATH_LENGTH + 4 + 4 + 4 + 4; // 1072
@@ -65,7 +65,7 @@ pub struct DemoHeader<'data> {
 
 impl<'data> DemoHeader<'data> {
 	pub fn parse(data: &'data [u8; HEADER_LENGTH]) -> Result<DemoHeader, IncorrectMagic> {
-		let mut reader  = Reader::new(data);
+		let mut reader  = ByteReader::new(data);
 
 		let magic = reader.bytes(8);
 
@@ -88,6 +88,6 @@ impl<'data> DemoHeader<'data> {
 	}
 }
 
-fn str<'a>(reader: &mut Reader<'a>) -> HeaderStr<'a> {
+fn str<'a>(reader: &mut ByteReader<'a>) -> HeaderStr<'a> {
 	HeaderStr::from_slice(reader.bytes(260)).unwrap()
 }

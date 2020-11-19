@@ -1,4 +1,4 @@
-use crate::demo::bits::BitReader;
+use bitstream::BitReader;
 use crate::demo::parse::ParseError;
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]

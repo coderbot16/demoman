@@ -1,5 +1,5 @@
 use std::io::{self, Read};
-use crate::demo::bits::BitReader;
+use bitstream::BitReader;
 use crate::demo::parse::ParseError;
 use crate::demo::data_table::DataTables;
 use crate::demo::usercmd::{UserCmdDelta, PositionUpdate};

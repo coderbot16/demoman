@@ -2,7 +2,7 @@ extern crate dem;
 extern crate snap;
 
 use dem::demo::header::{self, DemoHeader};
-use dem::demo::bits::Bits;
+use bitstream::Bits;
 use dem::packets::{ProtocolVersion, PacketKind, Packet, PlaySound, SetCvars, GameEvent};
 use dem::packets::game_events::{GameEventList, GameEventInfo, Kind};
 use dem::packets::string_table::Extra;
