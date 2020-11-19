@@ -9,4 +9,5 @@ name = "dem_test"
 path = "src/main.rs"
 
 [dependencies]
+# Used for decompressing string table packets compressed with Snappy
 snap = "1.0.2"
