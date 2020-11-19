@@ -9,7 +9,7 @@ use dem::packets::game_events::{GameEventList, GameEventInfo, Kind};
 use dem::packets::string_table::Extra;
 use dem::demo::frame::{Frame, FramePayload};
 
-use std::io::{BufReader, Read, Seek, SeekFrom};
+use std::io::{self, BufReader, Read, Seek, SeekFrom};
 use std::fs::File;
 
 const MAX_PARSED_PACKETS: usize = 4096;
@@ -45,7 +45,16 @@ fn main() {
 	let mut file = BufReader::new(file);
 
 	let mut buf = [0; header::HEADER_LENGTH];
-	file.read(&mut buf[0..]).unwrap();
+
+	if let Err(err) = file.read_exact(&mut buf[0..]) {
+		eprintln!("error while reading demo file header: {:?}", err);
+
+		if err.kind() == io::ErrorKind::UnexpectedEof {
+			eprintln!("note: Demo file is too short to possibly be a valid demo file")
+		}
+
+		return
+	}
 
 	let demo = match DemoHeader::parse(&buf) {
 		Ok(header) => header,
