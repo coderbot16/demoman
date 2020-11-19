@@ -1,6 +1,6 @@
 use std::io;
 use std::string::FromUtf8Error;
-use demo::bits::BitReader;
+use crate::demo::bits::BitReader;
 use std::borrow::Cow;
 
 #[derive(Debug)]

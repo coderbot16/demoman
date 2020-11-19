@@ -1,6 +1,6 @@
 use std::collections::VecDeque;
-use demo::bits::BitReader;
-use demo::parse::ParseError;
+use crate::demo::bits::BitReader;
+use crate::demo::parse::ParseError;
 
 mod create;
 

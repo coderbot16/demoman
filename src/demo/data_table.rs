@@ -1,5 +1,5 @@
-use demo::bits::BitReader;
-use demo::parse::ParseError;
+use crate::demo::bits::BitReader;
+use crate::demo::parse::ParseError;
 use std::fmt::{self, Display, Formatter};
 
 #[derive(Debug, PartialEq, Clone)]

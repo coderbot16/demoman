@@ -1,4 +1,4 @@
-use demo::parse::{ParseError, Needed};
+use crate::demo::parse::{ParseError, Needed};
 
 pub struct BitReader<'i> {
 	input: &'i [u8],

@@ -1,5 +1,5 @@
-use demo::bits::{BitReader, Bits};
-use demo::parse::ParseError;
+use crate::demo::bits::{BitReader, Bits};
+use crate::demo::parse::ParseError;
 
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub struct GameEventList(pub Vec<GameEventInfo>);

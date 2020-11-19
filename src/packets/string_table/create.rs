@@ -1,7 +1,7 @@
-use demo::bits::BitReader;
-use demo::parse::ParseError;
-use packets::string_table::StringTable;
-use packets::CreateStringTable;
+use crate::demo::bits::BitReader;
+use crate::demo::parse::ParseError;
+use crate::packets::string_table::StringTable;
+use crate::packets::CreateStringTable;
 use snap::raw::Decoder;
 
 #[repr(u32)]

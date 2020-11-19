@@ -1,7 +1,7 @@
 use std::io::{self, Read};
-use demo::bits::BitReader;
-use demo::parse::ParseError;
-use demo::bytes::Reader;
+use crate::demo::bits::BitReader;
+use crate::demo::parse::ParseError;
+use crate::demo::bytes::Reader;
 use std::convert::TryInto;
 
 /// Delta encoded UserCmd.

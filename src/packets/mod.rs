@@ -1,8 +1,8 @@
 pub mod game_events;
 pub mod string_table;
 
-use demo::bits::{BitReader, Bits};
-use demo::parse::ParseError;
+use crate::demo::bits::{BitReader, Bits};
+use crate::demo::parse::ParseError;
 
 type EntityId = u16;
 

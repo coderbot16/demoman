@@ -1,5 +1,5 @@
-use demo::bits::BitReader;
-use demo::parse::ParseError;
+use crate::demo::bits::BitReader;
+use crate::demo::parse::ParseError;
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct Sound {

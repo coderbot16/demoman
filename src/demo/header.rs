@@ -1,7 +1,7 @@
 use std::fmt::{Debug, Formatter, Error};
 use std::str::{self, Utf8Error};
 use std::convert::TryInto;
-use demo::bytes::Reader;
+use crate::demo::bytes::Reader;
 
 pub const PATH_LENGTH: usize = 260;
 pub const HEADER_LENGTH: usize = 8 + 4 + 4 + PATH_LENGTH + PATH_LENGTH + PATH_LENGTH + PATH_LENGTH + 4 + 4 + 4 + 4; // 1072

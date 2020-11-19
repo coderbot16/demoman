@@ -1,9 +1,9 @@
 use std::io::{self, Read};
-use demo::bits::BitReader;
-use demo::parse::ParseError;
-use demo::data_table::DataTables;
-use demo::usercmd::{UserCmdDelta, PositionUpdate};
-use packets::string_table::StringTables;
+use crate::demo::bits::BitReader;
+use crate::demo::parse::ParseError;
+use crate::demo::data_table::DataTables;
+use crate::demo::usercmd::{UserCmdDelta, PositionUpdate};
+use crate::packets::string_table::StringTables;
 
 // TODO: NetProto 36+: CustomData frame
 
