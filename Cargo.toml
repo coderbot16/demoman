@@ -9,7 +9,6 @@ name = "dem_test"
 path = "src/main.rs"
 
 [dependencies]
-nom = "^2.0"
 arrayref = "^0.3.2"
 byteorder = "1.0.0"
 snap = "0.2.3"

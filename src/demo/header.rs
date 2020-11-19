@@ -1,7 +1,5 @@
-use ::nom::IResult;
 use std::fmt::{Debug, Formatter, Error};
 use std::str::{self, Utf8Error};
-use nom::{le_i32, le_f32};
 
 pub const PATH_LENGTH: usize = 260;
 pub const HEADER_LENGTH: usize = 8 + 4 + 4 + PATH_LENGTH + PATH_LENGTH + PATH_LENGTH + PATH_LENGTH + 4 + 4 + 4 + 4; // 1072
@@ -65,35 +63,64 @@ pub struct DemoHeader<'data> {
 }
 
 impl<'data> DemoHeader<'data> {
-	pub fn parse(data: &'data [u8]) -> IResult<&'data [u8], DemoHeader<'data>, u32> {
-		parse_demo_header(data)
+	pub fn parse(data: &'data [u8; HEADER_LENGTH]) -> Result<DemoHeader, IncorrectMagic> {
+		let mut reader  = Reader {
+			bytes: data
+		};
+
+		let magic = reader.grab(8);
+
+		if magic !=  b"HL2DEMO\0" {
+			return Err(IncorrectMagic(magic));
+		}
+
+		Ok(DemoHeader {
+			demo_protocol: reader.i32(),
+			network_protocol: reader.i32(),
+			server_name: reader.str(),
+			client_name: reader.str(),
+			map_name: reader.str(),
+			game_directory: reader.str(),
+			playback_seconds: reader.f32(),
+			ticks: reader.i32(),
+			frames: reader.i32(),
+			signon_length: reader.i32()
+		})
 	}
 }
 
-named!(pub parse_demo_header<DemoHeader>,
-	do_parse!(
-		tag!(b"HL2DEMO\0") >>
-		demo_protocol: le_i32 >>
-		network_protocol: le_i32 >>
-		server_name: take!(PATH_LENGTH) >>
-		client_name: take!(PATH_LENGTH) >>
-		map_name: take!(PATH_LENGTH) >>
-		game_directory: take!(PATH_LENGTH) >>
-		playback_seconds: le_f32 >>
-		ticks: le_i32 >>
-		frames: le_i32 >>
-		signon_length: le_i32 >>
-		(DemoHeader {
-				demo_protocol:    demo_protocol,
-				network_protocol: network_protocol,
-				server_name:      HeaderStr::from_slice(server_name).unwrap(),
-				client_name:      HeaderStr::from_slice(client_name).unwrap(),
-				map_name:         HeaderStr::from_slice(map_name).unwrap(),
-				game_directory:   HeaderStr::from_slice(game_directory).unwrap(),
-				playback_seconds: playback_seconds,
-				ticks:            ticks,
-				frames:           frames,
-				signon_length:    signon_length
-		})
-	)
-);
+#[derive(Debug)]
+pub struct IncorrectMagic<'a>(&'a [u8]);
+
+struct Reader<'a> {
+	bytes: &'a [u8]
+}
+
+impl<'a> Reader<'a> {
+	fn grab(&mut self, len: usize) -> &'a [u8] {
+		let (requested, rest) = self.bytes.split_at(len);
+		self.bytes = rest;
+
+		requested
+	}
+
+	fn str(&mut self) -> HeaderStr<'a> {
+		HeaderStr::from_slice(self.grab(260)).unwrap()
+	}
+
+	fn u32(&mut self) -> u32 {
+		if let &[a, b, c, d] = self.grab(4) {
+			u32::from_le_bytes([a, b, c, d])
+		} else {
+			unreachable!()
+		}
+	}
+
+	fn i32(&mut self) -> i32 {
+		self.u32() as i32
+	}
+
+	fn f32(&mut self) -> f32 {
+		f32::from_bits(self.u32())
+	}
+}

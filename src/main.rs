@@ -1,5 +1,4 @@
 extern crate dem;
-extern crate nom;
 extern crate byteorder;
 extern crate snap;
 
@@ -44,8 +43,18 @@ fn main() {
 
 	let mut buf = [0; header::HEADER_LENGTH];
 	file.read(&mut buf[0..]).unwrap();
-	
-	let demo = DemoHeader::parse(&mut buf[0..]).unwrap().1;
+
+	let demo = match DemoHeader::parse(&buf) {
+		Ok(header) => header,
+		Err(err) => {
+			eprintln!("error while reading demo file header: {:?}", err);
+			eprintln!("note: Demo file had incorrect magic value, expected HL2DEMO\\0 at start of file");
+			eprintln!("note: This doesn't appear to be a valid demo file");
+
+			return
+		}
+	};
+
 	println!("Demo protocol {}, carrying network protocol {}", demo.demo_protocol, demo.network_protocol);
 	println!("Server: {:?}", demo.server_name);
 	println!("Client: {:?}", demo.client_name);
