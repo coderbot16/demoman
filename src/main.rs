@@ -1,4 +1,4 @@
-extern crate dem;
+mod payload;
 
 use demo::header::{self, DemoHeader};
 use bitstream::Bits;
@@ -6,6 +6,7 @@ use demo::packets::{ProtocolVersion, PacketKind, Packet, PlaySound, SetCvars, Ga
 use demo::packets::game_events::{GameEventList, GameEventInfo, Kind};
 use demo::string_table::Extra;
 use demo::frame::{Frame, FramePayload};
+use payload::game_events;
 
 use std::io::{self, BufReader, Read, Seek, SeekFrom};
 use std::fs::File;
@@ -252,7 +253,7 @@ impl Handler for ShowGameEvents {
 
 				//println!("  Index: {}", id, game_event.name);
 
-				use dem::payload::game_events::Value;
+				use game_events::Value;
 
 				let mut values = ::std::collections::HashMap::new();
 

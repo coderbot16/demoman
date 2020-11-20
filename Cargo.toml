@@ -4,11 +4,6 @@ version = "0.1.0"
 authors = ["coderbot <coderbot16@gmail.com>"]
 edition = "2018"
 
-[[bin]]
-doc = false
-name = "dem_test"
-path = "src/main.rs"
-
 [dependencies]
 bitstream = { path = "bitstream" }
 demo = { path = "demo" }
