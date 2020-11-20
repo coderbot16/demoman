@@ -1,9 +1,7 @@
-[package]
-name = "dem"
-version = "0.1.0"
-authors = ["coderbot <coderbot16@gmail.com>"]
-edition = "2018"
+[workspace]
 
-[dependencies]
-bitstream = { path = "bitstream" }
-demo = { path = "demo" }
+members = [
+	"bitstream",
+	"demo",
+	"dumper"
+]
