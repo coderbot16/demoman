@@ -1,12 +1,11 @@
 extern crate dem;
-extern crate snap;
 
-use dem::demo::header::{self, DemoHeader};
+use demo::header::{self, DemoHeader};
 use bitstream::Bits;
-use dem::packets::{ProtocolVersion, PacketKind, Packet, PlaySound, SetCvars, GameEvent};
-use dem::packets::game_events::{GameEventList, GameEventInfo, Kind};
-use dem::packets::string_table::Extra;
-use dem::demo::frame::{Frame, FramePayload};
+use demo::packets::{ProtocolVersion, PacketKind, Packet, PlaySound, SetCvars, GameEvent};
+use demo::packets::game_events::{GameEventList, GameEventInfo, Kind};
+use demo::string_table::Extra;
+use demo::frame::{Frame, FramePayload};
 
 use std::io::{self, BufReader, Read, Seek, SeekFrom};
 use std::fs::File;

@@ -1,5 +1,4 @@
-use bitstream::BitReader;
-use crate::demo::parse::ParseError;
+use bitstream::{BitReader, InsufficientBits};
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct Sound {
@@ -46,7 +45,7 @@ impl SoundDelta {
 		}
 	}
 
-	pub fn parse(bits: &mut BitReader) -> Result<Self, ParseError> {
+	pub fn parse(bits: &mut BitReader) -> Result<Self, InsufficientBits> {
 		Ok(SoundDelta {
 			entity: if bits.read_bit()? {
 				Some(bits.read_bits(11)? as u16)
@@ -119,7 +118,7 @@ pub enum SequenceUpdate {
 }
 
 impl SequenceUpdate {
-	pub fn parse(bits: &mut BitReader) -> Result<Self, ParseError> {
+	pub fn parse(bits: &mut BitReader) -> Result<Self, InsufficientBits> {
 		Ok(if bits.read_bit()? {
 			SequenceUpdate::Unchanged
 		} else {

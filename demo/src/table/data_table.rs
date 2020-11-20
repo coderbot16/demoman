@@ -1,6 +1,25 @@
-use bitstream::BitReader;
-use crate::demo::parse::ParseError;
+use bitstream::{BitReader, InsufficientBits, BitParseError};
 use std::fmt::{self, Display, Formatter};
+
+#[derive(Debug)]
+pub enum DataTableParseError {
+	Bits(BitParseError),
+	BadRowKind {
+		kind_id: u32
+	}
+}
+
+impl From<InsufficientBits> for DataTableParseError {
+	fn from(err: InsufficientBits) -> Self {
+		Self::Bits(BitParseError::InsufficientBits(err))
+	}
+}
+
+impl From<BitParseError> for DataTableParseError {
+	fn from(err: BitParseError) -> Self {
+		Self::Bits(err)
+	}
+}
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct DataTables {
@@ -9,7 +28,7 @@ pub struct DataTables {
 }
 
 impl DataTables {
-	pub fn parse(bits: &mut BitReader) -> Result<Self, ParseError> {
+	pub fn parse(bits: &mut BitReader) -> Result<Self, DataTableParseError> {
 		let mut tables = Vec::new();
 
 		while bits.read_bit()? {
@@ -34,7 +53,7 @@ pub struct ClassLink {
 }
 
 impl ClassLink {
-	pub fn parse(bits: &mut BitReader) -> Result<Self, ParseError> {
+	pub fn parse(bits: &mut BitReader) -> Result<Self, BitParseError> {
 		let index = bits.read_u16()?;
 		let name = bits.read_string()?;
 		let table = bits.read_string()?;
@@ -51,7 +70,7 @@ pub struct DataTable {
 }
 
 impl DataTable {
-	pub fn parse(bits: &mut BitReader) -> Result<Self, ParseError> {
+	pub fn parse(bits: &mut BitReader) -> Result<Self, DataTableParseError> {
 		let needs_decoder = bits.read_bit()?;
 		let name = bits.read_string()?;
 		let entries = bits.read_bits(10)?;
@@ -78,9 +97,9 @@ pub struct Row {
 }
 
 impl Row {
-	pub fn parse(bits: &mut BitReader) -> Result<Self, ParseError> {
+	pub fn parse(bits: &mut BitReader) -> Result<Self, DataTableParseError> {
 		let kind_id = bits.read_bits(5)?;
-		let kind = RowKind::from_id(kind_id).ok_or(ParseError::BadEnumIndex { name: "data_table::RowKind", value: kind_id})?;
+		let kind = RowKind::from_id(kind_id).ok_or(DataTableParseError::BadRowKind { kind_id })?;
 
 		let name = bits.read_string()?;
 		let flags = Flags(bits.read_u16()?);

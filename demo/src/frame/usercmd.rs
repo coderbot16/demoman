@@ -1,6 +1,5 @@
 use std::io::{self, Read};
-use bitstream::{BitReader, ByteReader};
-use crate::demo::parse::ParseError;
+use bitstream::{BitReader, ByteReader, InsufficientBits};
 use std::convert::TryInto;
 
 /// Delta encoded UserCmd.
@@ -22,7 +21,7 @@ pub struct UserCmdDelta {
 }
 
 impl UserCmdDelta {
-	pub fn parse(reader: &mut BitReader) -> Result<Self, ParseError> {
+	pub fn parse(reader: &mut BitReader) -> Result<Self, InsufficientBits> {
 		Ok(UserCmdDelta {
 			command_number: if reader.read_bit()? { Some(reader.read_u32()?) } else { None },
 			tick_count:     if reader.read_bit()? { Some(reader.read_u32()?) } else { None },

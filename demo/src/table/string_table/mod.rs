@@ -1,16 +1,43 @@
 use std::collections::VecDeque;
-use bitstream::BitReader;
-use crate::demo::parse::ParseError;
+use bitstream::{BitReader, InsufficientBits, BitParseError};
 
 mod create;
 
-pub use self::create::NewStringTable;
+pub use self::create::{NewStringTable, DecompressionError};
+
+pub enum StringTableParseError {
+	Bits(BitParseError),
+	InvalidHistoryIndex(InvalidHistoryIndex),
+	InvalidStringIndex {
+		index: u32,
+		max_index: u32
+	},
+	Decompression(DecompressionError)
+}
+
+impl From<InsufficientBits> for StringTableParseError {
+	fn from(err: InsufficientBits) -> Self {
+		Self::Bits(BitParseError::InsufficientBits(err))
+	}
+}
+
+impl From<BitParseError> for StringTableParseError {
+	fn from(err: BitParseError) -> Self {
+		Self::Bits(err)
+	}
+}
+
+impl From<DecompressionError> for StringTableParseError {
+	fn from(err: DecompressionError) -> Self {
+		Self::Decompression(err)
+	}
+}
 
 #[derive(Debug, Clone)]
 pub struct StringTables(pub Vec<(String, StringTablePair)>);
 
 impl StringTables {
-	pub fn parse(bits: &mut BitReader) -> Result<Self, ParseError> {
+	pub fn parse(bits: &mut BitReader) -> Result<Self, StringTableParseError> {
 		let count = bits.read_u8()?;
 		let mut tables = Vec::with_capacity(count as usize);
 		
@@ -35,7 +62,7 @@ pub struct StringTablePair {
 }
 
 impl StringTablePair {
-	pub fn parse(bits: &mut BitReader) -> Result<Self, ParseError>{
+	pub fn parse(bits: &mut BitReader) -> Result<Self, StringTableParseError> {
 		Ok(StringTablePair {
 			primary: StringTable::parse(bits)?,
 			client: if bits.read_bit()? { Some(StringTable::parse(bits)?) } else { None }
@@ -82,7 +109,7 @@ impl StringTable {
 		self.capacity
 	}
 
-	pub fn parse(bits: &mut BitReader) -> Result<Self, ParseError> {
+	pub fn parse(bits: &mut BitReader) -> Result<Self, StringTableParseError> {
 		let count = bits.read_u16()?;
 		let mut strings = Vec::with_capacity(usize::from(count));
 
@@ -107,7 +134,7 @@ impl StringTable {
 		})
 	}
 
-	pub fn update(&mut self, bits: &mut BitReader, updated: u16) -> Result<(), ParseError> {
+	pub fn update(&mut self, bits: &mut BitReader, updated: u16) -> Result<(), StringTableParseError> {
 		let index_bits = (16 - (self.capacity.unwrap() as u16).leading_zeros()) as u8 - 1;
 
 		let mut tracker = StateTracker::new();
@@ -141,9 +168,7 @@ impl StringTable {
 				string
 			};
 
-			let (index, string) = tracker.read(row).map_err(|invalid_index|
-				ParseError::OutOfBounds { name: "string_table::HistoryIndex", value: u32::from(invalid_index.index), min: 0, max: u32::from(invalid_index.len - 1)}
-			)?;
+			let (index, string) = tracker.read(row).map_err(StringTableParseError::InvalidHistoryIndex)?;
 
 			let extra = if bits.read_bit()? {
 				match self.fixed_extra_size {
@@ -173,7 +198,10 @@ impl StringTable {
 						row.1 = extra;
 					}
 				},
-				None => return Err(ParseError::OutOfBounds { name: "string_table::StringIndex", value: index, min: 0, max: max_index})
+				None => return Err(StringTableParseError::InvalidStringIndex {
+					index,
+					max_index
+				})
 			}
 		}
 
@@ -185,7 +213,7 @@ impl StringTable {
 
 /// Reference to an invalid out of bounds history index.
 #[derive(Debug, Clone)]
-struct InvalidHistoryIndex {
+pub struct InvalidHistoryIndex {
 	index: u8,
 	len: u8
 }

@@ -11,9 +11,15 @@ pub struct InsufficientBits {
 
 /// An error generated while reading a string from a bit stream
 #[derive(Debug)]
-pub enum ReadStringError {
+pub enum BitParseError {
 	InsufficientBits(InsufficientBits),
 	Utf8(FromUtf8Error)
+}
+
+impl From<InsufficientBits> for BitParseError {
+	fn from(err: InsufficientBits) -> Self {
+		Self::InsufficientBits(err)
+	}
 }
 
 pub struct BitReader<'i> {
@@ -271,13 +277,13 @@ impl<'i> BitReader<'i> {
 		))
 	}
 
-	pub fn read_string(&mut self) -> Result<String, ReadStringError> {
+	pub fn read_string(&mut self) -> Result<String, BitParseError> {
 		// TODO: This is not pure, parse errors are not recoverable.
 
 		let mut data = Vec::new();
 
 		loop {
-			let value = self.read_u8().map_err(ReadStringError::InsufficientBits)?;
+			let value = self.read_u8().map_err(BitParseError::InsufficientBits)?;
 
 			if value == 0 {
 				break;
@@ -286,7 +292,7 @@ impl<'i> BitReader<'i> {
 			data.push(value);
 		}
 
-		String::from_utf8(data).map_err(ReadStringError::Utf8)
+		String::from_utf8(data).map_err(BitParseError::Utf8)
 	}
 
 	pub fn read_var_u32(&mut self) -> Result<u32, InsufficientBits> {

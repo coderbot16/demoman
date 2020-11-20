@@ -9,6 +9,14 @@ name = "dem"
 version = "0.1.0"
 dependencies = [
  "bitstream",
+ "demo",
+]
+
+[[package]]
+name = "demo"
+version = "0.1.0"
+dependencies = [
+ "bitstream",
  "snap",
 ]
 

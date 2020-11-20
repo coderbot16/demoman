@@ -1,11 +1,10 @@
-use bitstream::{BitReader, Bits};
-use crate::demo::parse::ParseError;
+use bitstream::{BitReader, Bits, BitParseError};
 
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub struct GameEventList(pub Vec<GameEventInfo>);
 
 impl GameEventList {
-	pub fn parse(bits: &mut BitReader) -> Result<Self, ParseError> {
+	pub fn parse(bits: &mut BitReader) -> Result<Self, BitParseError> {
 		let count = bits.read_bits(9)?;
 		let bits_len = bits.read_bits(20)?;
 
@@ -62,7 +61,7 @@ pub struct GameEventInfo {
 }
 
 impl GameEventInfo {
-	pub fn parse(bits: &mut BitReader) -> Result<Self, ParseError> {
+	pub fn parse(bits: &mut BitReader) -> Result<Self, BitParseError> {
 		let index = bits.read_bits(9)? as u16;
 		let name = bits.read_string()?;
 		let mut properties = Vec::new();

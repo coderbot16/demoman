@@ -1,8 +1,16 @@
 use bitstream::BitReader;
-use crate::demo::parse::ParseError;
-use crate::packets::string_table::StringTable;
+use crate::string_table::StringTable;
 use crate::packets::CreateStringTable;
 use snap::raw::Decoder;
+use super::StringTableParseError;
+
+#[derive(Debug)]
+pub enum DecompressionError {
+	// string table compressed size is too small, must be at least 4 to contain compression magic
+	CompressedSizeTooSmall,
+	BadCompressionType(u32),
+	Snappy(snap::Error)
+}
 
 #[repr(u32)]
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
@@ -31,7 +39,7 @@ pub struct NewStringTable {
 }
 
 impl NewStringTable {
-	pub fn from_packet(packet: CreateStringTable) -> Result<Self, ParseError> {
+	pub fn from_packet(packet: CreateStringTable) -> Result<Self, StringTableParseError> {
 		let fixed_extra_size = packet.fixed_userdata_size.map(|(_bytes, bits)| bits);
 		let mut table = StringTable::create(packet.entries as usize, packet.max_entries as usize, fixed_extra_size);
 
@@ -42,21 +50,21 @@ impl NewStringTable {
 			let compressed_size = bits.read_u32()?;
 
 			if compressed_size < 4 {
-				return Err(ParseError::Custom("string table compressed size is too small, must be at least 4 to contain compression magic".into()));
+				return Err(StringTableParseError::Decompression(DecompressionError::CompressedSizeTooSmall));
 			}
 
 			let compressed_size = compressed_size - 4;
 
 			let compression = match CompressionType::from_id(bits.read_u32()?.swap_bytes()) {
 				Ok(compression) => compression,
-				Err(id) => return Err(ParseError::BadEnumIndex { name: "string_table::CompressionType", value: id })
+				Err(id) => return Err(StringTableParseError::Decompression(DecompressionError::BadCompressionType(id)))
 			};
 
-			let compressed = bits.read_u8_array(compressed_size as usize)?;
+			let compressed: Vec<u8> = bits.read_u8_array(compressed_size as usize)?;
 
 			let uncompressed = match compression {
 				CompressionType::Snappy => {
-					Decoder::new().decompress_vec(&compressed).expect("invalid snappy data")
+					Decoder::new().decompress_vec(&compressed).map_err(DecompressionError::Snappy)?
 				},
 				CompressionType::Lzss => {
 					println!("ERROR!");

@@ -1,11 +1,67 @@
 use std::io::{self, Read};
-use bitstream::BitReader;
-use crate::demo::parse::ParseError;
-use crate::demo::data_table::DataTables;
-use crate::demo::usercmd::{UserCmdDelta, PositionUpdate};
-use crate::packets::string_table::StringTables;
+use bitstream::{InsufficientBits, BitReader, BitParseError};
+use std::string::FromUtf8Error;
+use crate::string_table::{StringTables, InvalidHistoryIndex, DecompressionError, StringTableParseError};
+use crate::data_table::{DataTableParseError, DataTables};
+
+mod usercmd;
+
+use usercmd::{UserCmdDelta, PositionUpdate};
 
 // TODO: NetProto 36+: CustomData frame
+
+#[derive(Debug)]
+pub enum FrameParseError {
+	Bits(BitParseError),
+	Io(io::Error),
+	BadRowKind {
+		kind_id: u32
+	},
+	BadFrameKind {
+		kind_id: u8
+	},
+	InvalidHistoryIndex(InvalidHistoryIndex),
+	InvalidStringIndex {
+		index: u32,
+		max_index: u32
+	},
+	Decompression(DecompressionError)
+}
+
+impl From<InsufficientBits> for FrameParseError {
+	fn from(err: InsufficientBits) -> Self {
+		Self::Bits(BitParseError::InsufficientBits(err))
+	}
+}
+
+impl From<FromUtf8Error> for FrameParseError {
+	fn from(err: FromUtf8Error) -> Self {
+		Self::Bits(BitParseError::Utf8(err))
+	}
+}
+
+impl From<BitParseError> for FrameParseError {
+	fn from(err: BitParseError) -> Self {
+		Self::Bits(err)
+	}
+}
+
+impl From<io::Error> for FrameParseError {
+	fn from(err: io::Error) -> Self {
+		Self::Io(err)
+	}
+}
+
+impl From<StringTableParseError> for FrameParseError {
+	fn from(err: StringTableParseError) -> Self {
+		match err {
+			StringTableParseError::Bits(bits) => FrameParseError::Bits(bits),
+			StringTableParseError::InvalidHistoryIndex(err) => FrameParseError::InvalidHistoryIndex(err),
+			StringTableParseError::InvalidStringIndex { index, max_index } => FrameParseError::InvalidStringIndex { index, max_index },
+			StringTableParseError::Decompression(err) => FrameParseError::Decompression(err)
+		}
+	}
+}
 
 #[derive(Debug, Eq, PartialEq, Copy, Clone)]
 pub enum FrameKind {
@@ -80,14 +136,14 @@ pub struct Frame {
 }
 
 impl Frame {
-	pub fn parse<R>(input: &mut R) -> Result<Self, ParseError> where R: Read {
+	pub fn parse<R>(input: &mut R) -> Result<Self, FrameParseError> where R: Read {
 		let kind_id = read_u8(input)?;
-		let kind = FrameKind::from_id(kind_id).ok_or(ParseError::BadEnumIndex { name: "FrameKind", value: u32::from(kind_id) })?;
+		let kind = FrameKind::from_id(kind_id).ok_or(FrameParseError::BadFrameKind { kind_id })?;
 
 		Frame::parse_with_kind(input, kind)
 	}
 
-	pub fn parse_with_kind<R>(input: &mut R, kind: FrameKind) -> Result<Self, ParseError> where R: Read {
+	pub fn parse_with_kind<R>(input: &mut R, kind: FrameKind) -> Result<Self, FrameParseError> where R: Read {
 		let tick = if kind == FrameKind::Stop {
 			read_u24(input)?
 		} else {
@@ -183,7 +239,7 @@ impl DataTablesFrame {
 		DataTablesFrame(data)
 	}
 
-	pub fn parse(&self) -> Result<DataTables, ParseError> {
+	pub fn parse(&self) -> Result<DataTables, DataTableParseError> {
 		let mut bits = BitReader::new(&self.0);
 
 		let tables = DataTables::parse(&mut bits)?;
@@ -208,7 +264,7 @@ impl StringTablesFrame {
 		StringTablesFrame(data)
 	}
 
-	pub fn parse(&self) -> Result<StringTables, ParseError> {
+	pub fn parse(&self) -> Result<StringTables, FrameParseError> {
 		let mut bits = BitReader::new(&self.0);
 
 		let tables = StringTables::parse(&mut bits)?;
@@ -233,7 +289,7 @@ impl UserCmdFrame {
 		UserCmdFrame(data)
 	}
 
-	pub fn parse(&self) -> Result<UserCmdDelta, ParseError> {
+	pub fn parse(&self) -> Result<UserCmdDelta, InsufficientBits> {
 		let mut bits = BitReader::new(&self.0);
 
 		let tables = UserCmdDelta::parse(&mut bits)?;

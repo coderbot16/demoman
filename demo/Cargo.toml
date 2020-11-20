@@ -1,0 +1,12 @@
+[package]
+name = "demo"
+version = "0.1.0"
+authors = ["coderbot <coderbot16@gmail.com>"]
+edition = "2018"
+description = "Source Engine demo file format parser"
+license = "GPL-3.0-or-later"
+
+[dependencies]
+# Used for decompressing string table packets compressed with Snappy
+snap = "1.0.2"
+bitstream = { path = "../bitstream" }
