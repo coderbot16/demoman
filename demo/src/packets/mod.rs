@@ -1,4 +1,5 @@
 pub mod game_events;
+mod sound;
 
 use bitstream::{BitReader, Bits, BitParseError};
 
